@@ -1,0 +1,190 @@
+﻿@page "/counter"
+
+@using DTO
+@using DTO.Cliente
+@using System.Text.Json
+@inject ClienteService ClienteService
+
+<h3>Clientes</h3>
+
+<div class="form-row">
+    <div class="form-group">
+        <label for="campoBusqueda">Buscar por:</label>
+        <select id="campoBusqueda" @bind="campoBusqueda" class="form-control">
+            <option value="Nombre_Cliente">Nombre</option>
+            <option value="Apellido_Cliente">Apellido</option>
+            <option value="Numero_Cliente">Número de Cliente</option>
+            <option value="Nro_Doc_Cliente">Número de Documento</option>
+            <option value="Estado_Cliente">Estado</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="valorBusqueda">Valor:</label>
+        <input id="valorBusqueda" @bind="valorBusqueda" class="form-control" />
+    </div>
+</div>
+<button class="btn btn-primary" @onclick="BuscarClientes">Buscar</button>
+<button class="btn btn-secondary" @onclick="LimpiarFiltros">Limpiar Filtros</button>
+
+@if (isLoading)
+{
+    <p>Cargando...</p>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p class="text-danger">@errorMessage</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>Email</th>
+                <th>Número Cliente</th>
+                <th>Nro Doc</th>
+                <th>Tipo Doc</th>
+                <th>Estado Civil</th>
+                <th>Fecha Nacimiento</th>
+                <th>Sexo</th>
+                <th>Nacionalidad</th>
+                <th>Fecha Alta</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var cliente in clientes)
+            {
+                <tr>
+                    <td>@cliente.Nombre</td>
+                    <td>@cliente.Apellido</td>
+                    <td>@cliente.Email</td>
+                    <td>@cliente.Numero_Cliente</td>
+                    <td>@cliente.Nro_Doc</td>
+                    <td>@cliente.Tipo_Doc</td>
+                    <td>@cliente.Estado_Civil</td>
+                    <td>@cliente.Fecha_Nacimiento?.ToString("dd/MM/yyyy")</td>
+                    <td>@cliente.Sexo</td>
+                    <td>@cliente.Nacionalidad</td>
+                    <td>@cliente.Fecha_Alta_Cliente.ToString("dd/MM/yyyy")</td>
+                    <td>@(cliente.Estado ? "Activo" : "Inactivo")</td>
+                    <td><button class="btn btn-primary" @onclick="() => SeleccionarCliente(cliente)">Ver Detalle</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (clienteSeleccionado != null)
+    {
+        <h3>Detalle del Cliente</h3>
+        <div class="detail-container">
+            <div class="detail-item">
+                <label>Número de Cliente:</label>
+                <input value="@clienteSeleccionado.Numero_Cliente" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Nombre:</label>
+                <input value="@clienteSeleccionado.Nombre" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Apellido:</label>
+                <input value="@clienteSeleccionado.Apellido" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Email:</label>
+                <input value="@clienteSeleccionado.Email" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Tipo Doc:</label>
+                <input value="@clienteSeleccionado.Tipo_Doc" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Nro Doc:</label>
+                <input value="@clienteSeleccionado.Nro_Doc" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Fecha Nacimiento:</label>
+                <input value="@clienteSeleccionado.Fecha_Nacimiento?.ToString("dd/MM/yyyy")" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Estado Civil:</label>
+                <input value="@clienteSeleccionado.Estado_Civil" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Sexo:</label>
+                <input value="@clienteSeleccionado.Sexo" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Nacionalidad:</label>
+                <input value="@clienteSeleccionado.Nacionalidad" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Fecha Alta:</label>
+                <input value="@clienteSeleccionado.Fecha_Alta_Cliente.ToString("dd/MM/yyyy")" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Estado:</label>
+                <input value="@(clienteSeleccionado.Estado ? "Activo" : "Inactivo")" disabled />
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<ClienteToListDTO> clientes;
+    private ClienteToListDTO clienteSeleccionado;
+    private string campoBusqueda = "Nombre_Cliente";
+    private string valorBusqueda;
+    private bool isLoading = true;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarClientes();
+    }
+
+    private async Task CargarClientes()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            clientes = await ClienteService.GetAllClientesAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task BuscarClientes()
+    {
+        try
+        {
+            clientes = await ClienteService.BuscarClientesAsync(campoBusqueda, valorBusqueda);
+            clienteSeleccionado = null;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task LimpiarFiltros()
+    {
+        valorBusqueda = string.Empty;
+        campoBusqueda = "Nombre_Cliente";
+        await CargarClientes();
+    }
+
+    private void SeleccionarCliente(ClienteToListDTO cliente)
+    {
+        clienteSeleccionado = cliente;
+    }
+}
