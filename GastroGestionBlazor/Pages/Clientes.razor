@@ -81,11 +81,12 @@ else
             @foreach (var cliente in clientes)
             {
                 <tr>
+
                     <td>@cliente.Nombre</td>
                     <td>@cliente.Apellido</td>
                     <td>@cliente.Email</td>
                     <td>@cliente.Numero_Cliente</td>
-                    <td>@cliente.Nro_Doc</td>
+                    <td>@(cliente.Nro_Doc.HasValue ? cliente.Nro_Doc.ToString() : string.Empty)</td>
                     <td>@cliente.Tipo_Doc</td>
                     <td>@cliente.Estado_Civil</td>
                     <td>@cliente.Fecha_Nacimiento?.ToString("dd/MM/yyyy")</td>
@@ -298,8 +299,6 @@ else
             {
                 // Crear nuevo cliente
                 var clienteCreacionDTO = Mapper.Map<ClienteCreacionDTO>(clienteSeleccionado);
-                clienteCreacionDTO.Id_Empresa = Guid.Parse("2F678A85-B654-4464-BDDC-0C4D4CA20293");
-                clienteCreacionDTO.Id_Sucursal = Guid.Parse("2F678A85-B654-4464-BDDC-0C4D4CA20293");
                 await ClienteService.AgregarClienteAsync(clienteCreacionDTO);
             }
             else
@@ -328,6 +327,8 @@ else
         {
             // Implementa la lógica para eliminar el cliente aquí
             // await ClienteService.EliminarClienteAsync(cliente.Id_Cliente);
+
+            await ClienteService.EliminarClienteAsync(Mapper.Map < ClienteEdicionDTO >(cliente));
             await CargarClientes();
         }
         catch (Exception ex)

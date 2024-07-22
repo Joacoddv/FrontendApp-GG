@@ -96,11 +96,15 @@ public class ClienteService
         }
     }
 
-    public async Task EliminarClienteAsync(Guid idCliente)
+    public async Task EliminarClienteAsync(ClienteEdicionDTO clienteEditado)
     {
         try
         {
-            var response = await _httpClient.DeleteAsync($"https://localhost:5001/api/Cliente/{idCliente}");
+            var request = new HttpRequestMessage(HttpMethod.Delete, "https://localhost:5001/api/Cliente/Baja")
+            {
+                Content = JsonContent.Create(clienteEditado)
+            };
+            var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException httpEx)
