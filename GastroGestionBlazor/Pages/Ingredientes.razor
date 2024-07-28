@@ -1,0 +1,265 @@
+﻿@page "/ingredientes"
+
+@using DTO
+@using DTO.Ingredientes
+@using System.Text.Json
+@inject IngredienteService IngredienteService
+@inject IMapper Mapper
+
+<h3>Ingredientes</h3>
+<hr class="custom-line" />
+
+<div class="form-row">
+    <button class="btn btn-primary" @onclick="AgregarNuevoIngrediente"><i class="fas fa-plus"></i> Nuevo ingrediente</button>
+</div>
+
+<div class="search-container">
+    <div class="form-group">
+        <label for="campoBusqueda">Filtrar por:</label>
+        <select id="campoBusqueda" @onchange="OnCampoBusquedaChanged" class="form-control">
+            <option value="Numero_Ingrediente">Nombre</option>
+            <option value="Nombre_Ingrediente">Apellido</option>
+            <option value="Nombre_exacto_Ingrediente">Número de cliente</option>
+            <option value="Descripcion_Ingrediente">Número de documento</option>
+            <option value="Medida_Ingrediente">Estado</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="valorBusqueda">Valor:</label>
+        <input id="valorBusqueda" @bind="valorBusqueda" class="form-control" />
+    </div>
+    <div class="form-group">
+        <button class="btn btn-primary" @onclick="BuscarIngredientes">Buscar</button>
+        <button class="btn btn-secondary" @onclick="LimpiarFiltros">Limpiar filtros</button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessageBusqueda))
+{
+    <p class="text-danger">@errorMessageBusqueda</p>
+}
+
+@if (isLoading)
+{
+    <p>Cargando...</p>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p class="text-danger">@errorMessage</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Numero ingredeinte</th>
+                <th>Nombre</th>
+                <th>Descripcion</th>
+                <th>Medida</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var ingrediente in ingredientes)
+            {
+                <tr>
+
+                    <td>@ingrediente.Numero_ingrediente</td>
+                    <td>@ingrediente.Nombre_Ingrediente</td>
+                    <td>@ingrediente.Descripcion</td>
+                    <td>@ingrediente.Medida</td>
+                    <td>@ingrediente.Estado</td>
+                    <td class="action-buttons">
+                        <button class="btn btn-info" @onclick="() => VerDetalle(ingrediente)" title="Ver Detalle"><i class="fas fa-eye"></i></button>
+                        <button class="btn btn-info" @onclick="() => EditarInrediente(ingrediente)" title="Editar Ingrediente"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-info" @onclick="() => EliminarIngrediente(ingrediente)" title="Eliminar Ingrediente"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (ingredienteSeleccionado != null && !isEditing)
+    {
+        <h3>Detalle del ingrediente</h3>
+        <div class="detail-container">
+            <div class="detail-item">
+                <label>Número de ingrediente:</label>
+                <input value="@ingredienteSeleccionado.Numero_ingrediente" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Nombre:</label>
+                <input value="@ingredienteSeleccionado.Nombre_Ingrediente" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Descripción:</label>
+                <input value="@ingredienteSeleccionado.Descripcion" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Medida:</label>
+                <input value="@ingredienteSeleccionado.Medida" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Estado:</label>
+                <input value="@(ingredienteSeleccionado.Estado ? "Activo" : "Inactivo")" disabled />
+            </div>
+        </div>
+    }
+
+    @if (isEditing)
+    {
+        <h3>@(ingredienteSeleccionado == null ? "Agregar ingrediente" : "Editar ingrediente")</h3>
+        <div class="detail-container">
+            <div class="detail-item">
+                <label>Nombre:</label>
+                <input @bind="ingredienteSeleccionado.Nombre_Ingrediente" class="form-control" />
+            </div>
+            <div class="detail-item">
+                <label>Descripción:</label>
+                <input @bind="ingredienteSeleccionado.Descripcion" class="form-control" />
+            </div>
+            <div class="detail-item">
+                <label>Medida:</label>
+                <input @bind="ingredienteSeleccionado.Medida" class="form-control" />
+            </div>
+            <div class="detail-item">
+                <label>Estado:</label>
+                <input @bind="ingredienteSeleccionado.Estado" class="form-control" />
+            </div>
+            <div class="mt-3">
+                <button class="btn btn-primary" @onclick="GuardarIngrediente">Guardar</button>
+                <button class="btn btn-secondary" @onclick="CancelarEdicion">Cancelar</button>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<IngredienteToListDTO> ingredientes;
+    private IngredienteToListDTO ingredienteSeleccionado;
+    private IngredienteCreacionDTO nuevoIngrediente;
+    private string campoBusqueda = "Numero_Ingrediente";
+    private string valorBusqueda;
+    private bool isLoading = true;
+    private string errorMessage;
+    private string errorMessageBusqueda;
+    private bool isEditing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarIngredientes();
+    }
+
+    private async Task CargarIngredientes()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            ingredientes = await IngredienteService.GetAllIngredientesAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OnCampoBusquedaChanged(ChangeEventArgs e)
+    {
+        campoBusqueda = e.Value.ToString();
+    }
+
+    private async Task BuscarIngredientes()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessageBusqueda = null;
+            ingredientes = await IngredienteService.BuscarIngredienteAsync(campoBusqueda,valorBusqueda);
+        }
+        catch (Exception ex)
+        {
+            errorMessageBusqueda = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LimpiarFiltros()
+    {
+        valorBusqueda = string.Empty;
+        errorMessageBusqueda = string.Empty;
+        ingredienteSeleccionado = null;
+        isEditing = false;
+        await CargarIngredientes();
+    }
+
+    private void VerDetalle(IngredienteToListDTO ingrediente)
+    {
+        ingredienteSeleccionado = ingrediente;
+        isEditing = false;
+    }
+
+    private void EditarInrediente(IngredienteToListDTO ingrediente)
+    {
+        ingredienteSeleccionado = ingrediente;
+        isEditing = true;
+    }
+
+    private void AgregarNuevoIngrediente()
+    {
+        ingredienteSeleccionado = new IngredienteToListDTO();
+        isEditing = true;
+    }
+
+    private async Task GuardarIngrediente()
+    {
+        try
+        {
+            if (ingredienteSeleccionado.Id_Ingrediente == Guid.Empty)
+            {
+                // Crear nuevo ingrediente
+                var ingredienteCreacionDTO = Mapper.Map<IngredienteCreacionDTO>(ingredienteSeleccionado);
+                await IngredienteService.AgregarIngredienteAsync(ingredienteCreacionDTO);
+            }
+            else
+            {
+                // Editar ingrediente existente
+                await IngredienteService.EditarIngredienteAsync(Mapper.Map<IngredienteEdicionDTO>(ingredienteSeleccionado));
+            }
+            await CargarIngredientes();
+            isEditing = false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void CancelarEdicion()
+    {
+        ingredienteSeleccionado = null;
+        isEditing = false;
+    }
+
+    private async Task EliminarIngrediente(IngredienteToListDTO ingrediente)
+    {
+        try
+        {
+
+            await IngredienteService.EliminarIngredienteAsync(Mapper.Map<IngredienteEdicionDTO>(ingrediente));
+            await CargarIngredientes();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}
