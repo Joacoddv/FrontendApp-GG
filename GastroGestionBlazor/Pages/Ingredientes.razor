@@ -17,11 +17,11 @@
     <div class="form-group">
         <label for="campoBusqueda">Filtrar por:</label>
         <select id="campoBusqueda" @onchange="OnCampoBusquedaChanged" class="form-control">
-            <option value="Numero_Ingrediente">Nombre</option>
-            <option value="Nombre_Ingrediente">Apellido</option>
-            <option value="Nombre_exacto_Ingrediente">Número de cliente</option>
-            <option value="Descripcion_Ingrediente">Número de documento</option>
-            <option value="Medida_Ingrediente">Estado</option>
+            <option value="Numero_Ingrediente">Número de ingrediente</option>
+            <option value="Nombre_Ingrediente">Nombre</option>
+            <option value="Descripcion_Ingrediente">Descripción</option>
+            <option value="Medida_Ingrediente">Medida</option>
+            <option value="Estado_Ingrediente">Estado</option>
         </select>
     </div>
     <div class="form-group">
@@ -52,9 +52,9 @@ else
     <table class="table">
         <thead>
             <tr>
-                <th>Numero ingredeinte</th>
+                <th>Número Ingrediente</th>
                 <th>Nombre</th>
-                <th>Descripcion</th>
+                <th>Descripción</th>
                 <th>Medida</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -64,7 +64,6 @@ else
             @foreach (var ingrediente in ingredientes)
             {
                 <tr>
-
                     <td>@ingrediente.Numero_ingrediente</td>
                     <td>@ingrediente.Nombre_Ingrediente</td>
                     <td>@ingrediente.Descripcion</td>
@@ -72,7 +71,7 @@ else
                     <td>@ingrediente.Estado</td>
                     <td class="action-buttons">
                         <button class="btn btn-info" @onclick="() => VerDetalle(ingrediente)" title="Ver Detalle"><i class="fas fa-eye"></i></button>
-                        <button class="btn btn-info" @onclick="() => EditarInrediente(ingrediente)" title="Editar Ingrediente"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-info" @onclick="() => EditarIngrediente(ingrediente)" title="Editar Ingrediente"><i class="fas fa-edit"></i></button>
                         <button class="btn btn-info" @onclick="() => EliminarIngrediente(ingrediente)" title="Eliminar Ingrediente"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
@@ -127,13 +126,15 @@ else
                 <label>Estado:</label>
                 <input @bind="ingredienteSeleccionado.Estado" class="form-control" />
             </div>
-            <div class="mt-3">
+            <div class="form-actions">
                 <button class="btn btn-primary" @onclick="GuardarIngrediente">Guardar</button>
                 <button class="btn btn-secondary" @onclick="CancelarEdicion">Cancelar</button>
             </div>
         </div>
     }
 }
+
+<div class="footer-spacing"></div>
 
 @code {
     private List<IngredienteToListDTO> ingredientes;
@@ -178,9 +179,15 @@ else
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(valorBusqueda))
+            {
+                errorMessageBusqueda = "Por favor, complete el campo de búsqueda.";
+                return;
+            }
+
             isLoading = true;
             errorMessageBusqueda = null;
-            ingredientes = await IngredienteService.BuscarIngredienteAsync(campoBusqueda,valorBusqueda);
+            ingredientes = await IngredienteService.BuscarIngredienteAsync(campoBusqueda, valorBusqueda);
         }
         catch (Exception ex)
         {
@@ -207,7 +214,7 @@ else
         isEditing = false;
     }
 
-    private void EditarInrediente(IngredienteToListDTO ingrediente)
+    private void EditarIngrediente(IngredienteToListDTO ingrediente)
     {
         ingredienteSeleccionado = ingrediente;
         isEditing = true;
@@ -253,7 +260,6 @@ else
     {
         try
         {
-
             await IngredienteService.EliminarIngredienteAsync(Mapper.Map<IngredienteEdicionDTO>(ingrediente));
             await CargarIngredientes();
         }
