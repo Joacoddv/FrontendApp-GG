@@ -193,15 +193,26 @@ else
 
     private async Task ReHydrateAsync()
     {
+        // Runs on the SignalR Reconnected callback thread. Marshal the state mutation
+        // onto the render thread too (correct-by-construction regardless of hosting model).
+        List<OrdenTrabajoBoardItem> board;
+        string? error = null;
         try
         {
-            _items = await BoardService.GetBoardAsync();
+            board = await BoardService.GetBoardAsync();
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            board = _items;
+            error = ex.Message;
         }
-        await InvokeAsync(StateHasChanged);
+
+        await InvokeAsync(() =>
+        {
+            _items = board;
+            if (error is not null) _errorMessage = error;
+            StateHasChanged();
+        });
     }
 
     private void OnConnStateChanged()

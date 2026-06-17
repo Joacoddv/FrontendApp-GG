@@ -21,7 +21,11 @@ public sealed class KitchenBoardService
     public async Task<List<OrdenTrabajoBoardItem>> GetBoardAsync(CancellationToken ct = default)
     {
         var response = await _httpClient.GetAsync("ordenes-trabajo", ct);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, "No se pudo cargar el tablero de cocina.", ct);
+        }
+
         var result = await response.Content.ReadFromJsonAsync<List<OrdenTrabajoBoardItem>>(JsonOptions, ct);
         return result ?? new List<OrdenTrabajoBoardItem>();
     }
@@ -35,15 +39,24 @@ public sealed class KitchenBoardService
 
         if (!response.IsSuccessStatusCode)
         {
-            ProblemDetailsResponse? problem = null;
-            try
-            {
-                problem = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(JsonOptions, ct);
-            }
-            catch { /* ignore deserialization errors */ }
-
-            var message = problem?.Detail ?? problem?.Title ?? "No se pudo marcar la orden como lista.";
-            throw new ApiException(message);
+            await ThrowApiExceptionAsync(response, "No se pudo marcar la orden como lista.", ct);
         }
+    }
+
+    /// <summary>
+    /// Surfaces the server's RFC 7807 ProblemDetails (Spanish Detail/Title) as an ApiException,
+    /// falling back to the supplied message when the body cannot be parsed.
+    /// </summary>
+    private static async Task ThrowApiExceptionAsync(
+        HttpResponseMessage response, string fallback, CancellationToken ct)
+    {
+        ProblemDetailsResponse? problem = null;
+        try
+        {
+            problem = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(JsonOptions, ct);
+        }
+        catch { /* ignore deserialization errors */ }
+
+        throw new ApiException(problem?.Detail ?? problem?.Title ?? fallback);
     }
 }
