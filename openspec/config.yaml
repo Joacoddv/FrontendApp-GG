@@ -1,0 +1,49 @@
+project: GastroGestionBlazor
+phase: 7 — Frontend Integration (Blazor WASM → .NET 8 backend)
+engram_project: backendservice-gg
+artifact_store: hybrid
+
+context:
+  repo: GastroGestionBlazor
+  remote: FrontendApp-GG
+  framework: Blazor WebAssembly (net8.0)
+  roadmap_phase: 7 of 7 — connect frontend to modernized .NET 8 backend
+  ui_language: Spanish — all UI labels, page titles, button text, and user-facing strings use Spanish to match existing conventions
+  identifiers_language: English — code identifiers, comments, and commit messages use English
+  base_url_current: https://localhost:5001 (hardcoded — must be replaced with config-driven base URL in Phase 7)
+  auth: CustomAuthenticationStateProvider (stub — not yet wired to JWT backend)
+
+stack:
+  runtime: .NET 8.0 / WebAssembly
+  sdk: Microsoft.NET.Sdk.BlazorWebAssembly
+  packages:
+    - Microsoft.AspNetCore.Components.WebAssembly 8.0.4
+    - Microsoft.AspNetCore.Components.WebAssembly.Authentication 8.0.4
+    - Microsoft.AspNetCore.Components.Authorization 8.0.6
+    - AutoMapper 13.0.1
+  structure:
+    - Pages/ — Razor page components (Clientes, Ingredientes, Authentication, Home)
+    - Services/ — HTTP client services (ClienteService, IngredienteService)
+    - Dominio/ — domain model classes (flat, no layering)
+    - DTO/ — data transfer objects + AutoMapper profiles
+    - Layout/ — MainLayout, NavMenu, LoginDisplay
+    - wwwroot/ — static assets, index.html, service worker
+
+testing:
+  strict_tdd: false
+  reason: no test project detected — single .csproj in solution with no xUnit/NUnit/bUnit references
+  test_command: ~
+  unit: unavailable
+  integration: unavailable
+  e2e: unavailable
+  coverage: unavailable
+  note: If tests are added later, re-run sdd-init to update this config and activate Strict TDD Mode
+
+phase_rules:
+  proposal: architect the integration slice; include API contract alignment, auth wiring, HTTP client abstraction
+  spec: define acceptance criteria per endpoint wired; include error handling and loading states
+  design: define service layer abstractions, DTO alignment with backend contracts, component boundaries
+  tasks: break into reviewable slices (400-line PR budget); each task must compile and not regress existing pages
+  apply: Standard Mode (strict_tdd=false); build and manual smoke-test after each batch
+  verify: check HTTP calls match backend OpenAPI contracts; verify UI labels remain in Spanish; confirm no hardcoded localhost URLs in production paths
+  archive: tag completion of Phase 7; record migration delta from legacy API calls
