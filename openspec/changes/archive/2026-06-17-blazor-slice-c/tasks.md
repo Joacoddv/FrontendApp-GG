@@ -27,7 +27,7 @@ Chain strategy: pending
 
 | Unit | Goal | Likely PR | Notes |
 |------|------|-----------|-------|
-| 1 | All 9 tasks below | Single PR | Foundation → services → page → wiring; self-contained |
+| 1 | All 11 tasks below | Single PR | Foundation → services → page → wiring; self-contained |
 
 ---
 
@@ -47,13 +47,13 @@ Chain strategy: pending
 
 - [x] **BC-T05** — `Services/KitchenBoardService.cs` (NEW): sealed class, ctor `(HttpClient httpClient)`. Static `JsonOptions = new(JsonSerializerDefaults.Web){ Converters = { new JsonStringEnumConverter() } }`. `GetBoardAsync(CancellationToken ct = default)`: GET `"ordenes-trabajo"` (relative), deserialize `List<OrdenTrabajoBoardItem>`, return empty list on null. `MarcarListaAsync(Guid pedidoId, Guid otId, CancellationToken ct = default)`: POST `$"pedidos/{pedidoId}/ordenes-trabajo/{otId}/marcar-lista"` with null content; on `!IsSuccessStatusCode` deserialize `ProblemDetailsResponse`, throw `ApiException(problem?.Detail ?? problem?.Title ?? "No se pudo marcar la orden como lista.")`. Return body ignored. *(BC-02, BC-05, ADR-6, ADR-7)*
 
-- [x] **BC-T06** — `Services/KitchenRealtimeConnection.cs` (NEW): sealed class implementing `IAsyncDisposable`. Ctor `(ApiOptions apiOptions, IAuthService authService)`. Public property `HubConnectionState State`. `StartAsync(Action<OrdenTrabajoBoardItem> onOtChanged, Func<Task> onReconnected, Action onStateChanged, CancellationToken ct = default)`: build connection via `new HubConnectionBuilder().WithUrl($"{apiOptions.ApiBaseUrl.TrimEnd('/')}/hubs/kitchen", o => o.AccessTokenProvider = async () => await authService.GetTokenAsync()).WithAutomaticReconnect().AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter())).Build()`; wire `.On<OrdenTrabajoBoardItem>("OtChanged", onOtChanged)`; wire `Reconnected`, `Reconnecting`, `Closed` handlers (all call `onStateChanged`; `Reconnected` additionally calls `onReconnected`); then `await _connection.StartAsync(ct)`. `DisposeAsync()`: `await _connection.DisposeAsync()`. *(BC-03, BC-04, BC-06, ADR-1, ADR-10)*
+- [x] **BC-T06** — `Services/KitchenRealtimeConnection.cs` (NEW): sealed class implementing `IAsyncDisposable`. Ctor `(ApiOptions apiOptions, IAuthService authService)`. Public property `HubConnectionState State`. `StartAsync(Action<OrdenTrabajoBoardItem> onOtChanged, Func<Task> onReconnected, Action onStateChanged, CancellationToken ct = default)`: build connection via `new HubConnectionBuilder().WithUrl($"{apiOptions.ApiBaseUrl.TrimEnd('/')}/hubs/kitchen", o => o.AccessTokenProvider = async () => await authService.GetTokenAsync()).WithAutomaticReconnect().AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter())).Build()`; wire `.On<OrdenTrabajoBoardItem>("OtChanged", onOtChanged)`; wire `Reconnected`, `Reconnecting`, `Closed` handlers; then `await _connection.StartAsync(ct)`. `DisposeAsync()`: `await _connection.DisposeAsync()`. *(BC-03, BC-04, BC-06, ADR-1, ADR-10)*
 
 ---
 
 ## Phase 3: DI Wiring
 
-- [x] **BC-T07** — `Program.cs` (MODIFY): add `builder.Services.AddScoped<KitchenBoardService>();` after the existing `AddScoped<IngredienteService>()` line (line 54). No changes to `HttpClient` registration — the default `AuthorizedApi` client is already the factory output. `ApiOptions` singleton and `IAuthService` are already registered. *(BC-02, ADR-10)*
+- [x] **BC-T07** — `Program.cs` (MODIFY): add `builder.Services.AddScoped<KitchenBoardService>();` after the existing `AddScoped<IngredienteService>()` line. No changes to `HttpClient` registration. *(BC-02, ADR-10)*
 
 - [x] **BC-T08** — `_Imports.razor` (MODIFY): append two `@using` directives — `@using Microsoft.AspNetCore.SignalR.Client` and `@using GastroGestionBlazor.Contracts.OrdenesTrabajo` — after the existing `@using AutoMapper` line. *(BC-03, BC-07)*
 
@@ -61,24 +61,15 @@ Chain strategy: pending
 
 ## Phase 4: Page
 
-- [x] **BC-T09** — `Pages/Cocina.razor` (NEW): full page implementation per locked design.
-  - Directives: `@page "/ordenes-trabajo"`, `@attribute [Authorize(Roles="Cocinero,Administrador")]`, `@implements IAsyncDisposable`, inject `KitchenBoardService BoardService`, inject `ApiOptions ApiOptions`, inject `IAuthService AuthService`.
-  - State fields: `List<OrdenTrabajoBoardItem> _items = new()`, `bool _isLoading`, `string? _errorMessage`, `HashSet<Guid> _marking = new()`, `KitchenRealtimeConnection? _conn`, `HubConnectionState _connState`.
-  - `OnInitializedAsync`: set `_isLoading = true`; `_items = await BoardService.GetBoardAsync()`; build `_conn = new KitchenRealtimeConnection(ApiOptions, AuthService)`; `await _conn.StartAsync(OnOtChanged, ReHydrateAsync, OnConnStateChanged)`; set `_isLoading = false`.
-  - `DisposeAsync()`: `if (_conn != null) await _conn.DisposeAsync()`.
-  - `OnOtChanged(OrdenTrabajoBoardItem item)` — async lambda marshaled via `await InvokeAsync(...)`: `_items.RemoveAll(x => x.OtId == item.OtId)`, add if `!= Cancelada`, `_marking.Remove(item.OtId)`, `StateHasChanged()`.
-  - `ReHydrateAsync()`: `_items = await BoardService.GetBoardAsync(); await InvokeAsync(StateHasChanged)`.
-  - `OnConnStateChanged()`: `_connState = _conn?.State ?? HubConnectionState.Disconnected; InvokeAsync(StateHasChanged)`.
-  - `OnMarcarLista(OrdenTrabajoBoardItem item)`: guard `_marking.Contains(item.OtId)` → return; `_marking.Add(item.OtId)`; `try { await BoardService.MarcarListaAsync(item.PedidoId, item.OtId); } catch (ApiException ex) { _errorMessage = ex.Message; _marking.Remove(item.OtId); }`.
-  - Markup: connection-status badge (Conectado/Reconectando…/Desconectado); `_isLoading` → "Cargando tablero…" spinner; `_errorMessage` → dismissible red alert; board renders 3 columns (Pendientes / En preparación / Listas) from `_items.Where(i => i.Estado != EstadoOT.Cancelada).GroupBy(i => i.Estado)`; each card shows PedidoTipo (Spanish label map: Salon→Salón, TakeAway→TakeAway, Delivery→Delivery), OtId short ref, Estado, cocinero if assigned; Preparandose cards include "Marcar lista" button disabled when `_marking.Contains(item.OtId)`; empty board → "No hay órdenes de trabajo activas." *(BC-01, BC-02, BC-03, BC-04, BC-05, BC-06, ADR-2, ADR-6, ADR-8, ADR-9)*
+- [x] **BC-T09** — `Pages/Cocina.razor` (NEW): route `/ordenes-trabajo`, Authorize(Roles=Cocinero,Administrador), IAsyncDisposable. Board grouped by EstadoOT (Pendientes/En preparación/Listas), Cancelada hidden. Connection-status badge. Marcar lista echo-driven with _marking HashSet guard. OtChanged via InvokeAsync(StateHasChanged). *(BC-01..BC-06, ADR-2, ADR-6, ADR-8, ADR-9)*
 
 ---
 
 ## Phase 5: Verification
 
-- [x] **BC-T10** — NavMenu verification (READ-ONLY): confirm `Layout/NavMenu.razor` already contains `<AuthorizeView Roles="Cocinero,Administrador">` wrapping `href="ordenes-trabajo"`. Assert ZERO edits needed. If the entry is missing or uses a different href, raise as a blocker. *(BC-01, ADR-2)*
+- [x] **BC-T10** — NavMenu verification (READ-ONLY): CONFIRMED — `Layout/NavMenu.razor` already contains `<AuthorizeView Roles="Cocinero,Administrador">` wrapping `href="ordenes-trabajo"`. ZERO edits needed. *(BC-01, ADR-2)*
 
-- [x] **BC-T11** — Build green: run `dotnet build GastroGestionBlazor.sln` from the repo root; confirm 0 errors, 0 warnings related to this change. *(all)*
+- [x] **BC-T11** — Build green: `dotnet build GastroGestionBlazor.sln` → 0 errors, 2 pre-existing warnings (NU1903 AutoMapper vulnerability + CS8618 pre-existing nullable). No new warnings from this change. *(all)*
 
 ---
 

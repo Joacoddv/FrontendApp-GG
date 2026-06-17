@@ -42,7 +42,7 @@ The `_items =` assignment runs on the SignalR Reconnected-callback thread, not t
 var result = await BoardService.GetBoardAsync();
 await InvokeAsync(() => { _items = result; StateHasChanged(); });
 ```
-Severity: WARNING (WASM-safe). Carry forward to Slice C2 or next maintenance pass.
+Severity: WARNING (WASM-safe). Fixed in commit 0fe2c57 after PR merge.
 
 ---
 
@@ -98,7 +98,7 @@ No mismatch. Board will update correctly on live events.
 |----------|----------|---------------------|---------|
 | `OnOtChanged` | `_items.RemoveAll` + `_items.Add` + `_marking.Remove` + `StateHasChanged` | ALL inside `InvokeAsync(...)` | CORRECT |
 | `OnConnStateChanged` | `_connState =` + `StateHasChanged` | `_connState` outside, `StateHasChanged` inside `InvokeAsync` | WASM-SAFE / structurally imperfect |
-| `ReHydrateAsync` (Reconnected) | `_items =` + `StateHasChanged` | `_items` outside, `StateHasChanged` inside `InvokeAsync` | WASM-SAFE / see WARNING-02 |
+| `ReHydrateAsync` (Reconnected) | `_items =` + `StateHasChanged` | `_items` outside, `StateHasChanged` inside `InvokeAsync` | WASM-SAFE / fixed in 0fe2c57 |
 
 No bare `StateHasChanged()` call outside `InvokeAsync` exists anywhere in the codebase. No CRITICAL off-thread issue.
 
@@ -108,7 +108,8 @@ No bare `StateHasChanged()` call outside `InvokeAsync` exists anywhere in the co
 
 - Branch: `feat/blazor-slice-c`
 - Commits confirmed: `e713d10`, `1c532ab`, `2fb8e39`, `c81956e`
-- Untracked: `.atl/`, `GastroGestionBlazor/openspec/`, `openspec/changes/blazor-slice-c/` — SDD artifact directories only, no unexpected source changes
+- Post-verify fix commit: `0fe2c57` (addresses WARNING-01, WARNING-02)
+- PR #3 merged to `main` — merge commit: `6d93967`
 
 ---
 

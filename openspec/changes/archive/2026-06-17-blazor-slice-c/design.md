@@ -150,7 +150,7 @@ Cocina.razor (DisposeAsync) → connection.DisposeAsync()
 upgrades to `wss`/`ws` internally during transport negotiation. **Do NOT hand-rewrite the scheme.**
 Build the hub URL as `$"{ApiOptions.ApiBaseUrl.TrimEnd('/')}/hubs/kitchen"` → e.g.
 `https://localhost:7126/hubs/kitchen`. The client derives `wss://localhost:7126/hubs/kitchen` for the
-WebSocket transport automatically. (Manual scheme rewriting is unnecessary and error-prone.)
+WebSocket transport automatically.
 
 ---
 
@@ -232,23 +232,13 @@ public sealed class KitchenRealtimeConnection : IAsyncDisposable
     ValueTask DisposeAsync();
 }
 ```
-- Builds: `new HubConnectionBuilder().WithUrl($"{apiOptions.ApiBaseUrl.TrimEnd('/')}/hubs/kitchen",
-  o => o.AccessTokenProvider = async () => await authService.GetTokenAsync())
-  .WithAutomaticReconnect().Build();`
-- `connection.On<OrdenTrabajoBoardItem>("OtChanged", onOtChanged);`
-- `connection.Reconnected += _ => onReconnected();`
-- `connection.Reconnecting += _ => { onStateChanged(); return Task.CompletedTask; };`
-- `connection.Closed += _ => { onStateChanged(); return Task.CompletedTask; };`
-- Enum strings deserialize via the JSON protocol; configure
-  `.AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))`
-  on the builder so `EstadoOT`/`TipoPedido` strings bind to the client enums.
 
 ---
 
 ## Cocina.razor (`Pages/Cocina.razor`)
 
 - `@page "/ordenes-trabajo"`
-- `@attribute [Authorize(Roles = "Cocinero,Administrador")]` (page-level gate; hub gate is the backstop)
+- `@attribute [Authorize(Roles = "Cocinero,Administrador")]`
 - `@implements IAsyncDisposable`
 - `@inject KitchenBoardService BoardService`, `@inject ApiOptions ApiOptions`,
   `@inject IAuthService AuthService`
@@ -261,34 +251,9 @@ public sealed class KitchenRealtimeConnection : IAsyncDisposable
   - `Creada` → **"Pendientes"**
   - `Preparandose` → **"En preparación"**
   - `Lista` → **"Listas"**
-  - Group `_items.Where(i => i.Estado != EstadoOT.Cancelada).GroupBy(i => i.Estado)`.
-- **OT card**: shows `PlatoId`, `PedidoTipo` (Salón/TakeAway/Delivery — display Spanish via a small
-  map), Pedido/OT short id, cocinero legajo if assigned. On **Preparandose** cards render a
-  **"Marcar lista"** button → `OnMarcarLista(item)`.
-- **`OnMarcarLista(item)`**: if `_marking.Contains(item.OtId)` return; add to `_marking`;
-  `try { await BoardService.MarcarListaAsync(item.PedidoId, item.OtId); }`
-  `catch (ApiException ex) { _errorMessage = ex.Message; _marking.Remove(item.OtId); }`.
-  On success leave it in `_marking` (button stays disabled) until the echo arrives (ADR-6); when
-  `OnOtChanged` upserts the row to `Lista`, also remove it from `_marking`.
-- **`OnOtChanged(item)`** (off the UI thread → must marshal):
-  ```csharp
-  await InvokeAsync(() =>
-  {
-      _items.RemoveAll(x => x.OtId == item.OtId);
-      if (item.Estado != EstadoOT.Cancelada) _items.Add(item);   // upsert; Cancelada drops
-      _marking.Remove(item.OtId);
-      StateHasChanged();
-  });
-  ```
-  (`On<T>` callbacks run off the render thread — `InvokeAsync(StateHasChanged)` is mandatory.)
-- **`ReHydrateAsync()`** (Reconnected): `_items = await BoardService.GetBoardAsync();
-  await InvokeAsync(StateHasChanged);` — closes the missed-update gap.
-- **`OnConnStateChanged()`**: `_connState = _conn?.State ?? HubConnectionState.Disconnected;
-  InvokeAsync(StateHasChanged);`.
-- **Connection status indicator** (badge): `Connected` → **"Conectado"** (green),
-  `Reconnecting` → **"Reconectando…"** (amber), `Disconnected`/`Closed` → **"Desconectado"** (red).
-- **States**: `_isLoading` → spinner "Cargando tablero…"; loaded + empty → "No hay órdenes de
-  trabajo activas."; `_errorMessage` → dismissible red banner.
+- **`OnOtChanged(item)`** (off the UI thread → must marshal via `InvokeAsync`).
+- **`ReHydrateAsync()`** (Reconnected): re-runs GetBoardAsync to close missed-update gap.
+- Connection status badge: Conectado / Reconectando… / Desconectado.
 
 ---
 
@@ -313,47 +278,7 @@ New (under `GastroGestionBlazor/GastroGestionBlazor/`):
 Modify:
 - `GastroGestionBlazor.csproj` — add `Microsoft.AspNetCore.SignalR.Client` 8.0.x.
 - `Program.cs` — `builder.Services.AddScoped<KitchenBoardService>();`
-  (`ApiOptions` singleton + `IAuthService` already registered; default `HttpClient` = `AuthorizedApi`).
 - `_Imports.razor` — add `@using Microsoft.AspNetCore.SignalR.Client` and
-  `@using GastroGestionBlazor.Contracts.OrdenesTrabajo` (optional convenience).
+  `@using GastroGestionBlazor.Contracts.OrdenesTrabajo`.
 
 Unchanged: `Layout/NavMenu.razor`, all Slice A/B files, `Contracts/Common/*`.
-
----
-
-## Packages
-
-ADD: `Microsoft.AspNetCore.SignalR.Client` **8.0.x** (pin `8.0.6`). It is the correct in-browser WASM
-client. No other adds. `JsonStringEnumConverter` is in-framework. Nothing removed.
-
----
-
-## Risks / open items
-
-- **WS token expiry on reconnect** (Med): `AccessTokenProvider` re-pulls a fresh token each
-  (re)connect; expired token → hub rejects → "Desconectado", user re-logs (no refresh tokens). Accepted.
-- **Missed-update gap on reconnect** (Med): `WithAutomaticReconnect()` + `Reconnected` re-GET reconcile
-  the board. Accepted.
-- **Event-name / payload coupling** (Med): `"OtChanged"` + `OrdenTrabajoBoardResponse` are pinned to
-  verified backend names; client record member names/casing must match for STJ round-trip. Runtime
-  break on backend drift. Documented; lock the record.
-- **Off-thread callback** (High if missed): `On<OtChanged>` runs off the render thread →
-  `InvokeAsync(StateHasChanged)` is mandatory in `OnOtChanged`/`ReHydrate`/`OnConnStateChanged`.
-- **Optimistic-vs-echo** (Low): echo-driven (ADR-6) avoids rollback-on-422; `_marking` guard prevents
-  double-submit. If the echo is dropped, the next `Reconnected` re-GET reconciles.
-- **Dev TLS/WS origin** (Low): confirm `https://localhost:7126` dev cert is trusted and the backend
-  CORS/WS policy allows the Blazor dev origin before sign-off. Verify in smoke.
-- **No automated tests** (High): `strict_tdd false`, Standard Mode, no test project. Manual smoke only:
-  Cocinero/Admin sees board grouped (Spanish labels); backend OT change pushes live update without
-  refresh; "Marcar lista" on a Preparandose OT moves it to Listas via echo; marking an already-Lista
-  OT shows the Spanish 422 banner; non-Cocinero/Admin gated out of `/ordenes-trabajo` AND hub rejects;
-  transient drop → "Reconectando…" → reconnect + resync; navigate-away disposes the connection;
-  `dotnet build` green.
-
----
-
-## Artifacts
-- `GastroGestionBlazor/openspec/changes/blazor-slice-c/design.md` (this file)
-- engram `backendservice-gg` topic_key `sdd/blazor-slice-c/design`
-
-Next: `sdd-tasks` (after spec is ready).
