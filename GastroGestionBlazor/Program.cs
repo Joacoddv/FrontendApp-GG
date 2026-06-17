@@ -41,9 +41,9 @@ builder.Services.AddHttpClient("AuthorizedApi", client =>
 })
 .AddHttpMessageHandler<BearerTokenHandler>();
 
-// 5. Inject the authenticated client as the default HttpClient for existing services
-//    (ClienteService, IngredienteService). URL rewrites are Slice B — services still
-//    have their hardcoded legacy URLs; they will get the authenticated client now.
+// 5. Inject the authenticated client as the default HttpClient for the data services
+//    (ClienteService, IngredienteService). They use relative paths against ApiBaseUrl
+//    with the Bearer token attached by BearerTokenHandler.
 builder.Services.AddScoped(sp =>
 {
     var factory = sp.GetRequiredService<IHttpClientFactory>();
