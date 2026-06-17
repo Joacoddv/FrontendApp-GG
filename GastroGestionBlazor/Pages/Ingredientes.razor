@@ -1,10 +1,9 @@
-﻿@page "/ingredientes"
+@page "/ingredientes"
 
-@using DTO
-@using DTO.Ingredientes
-@using System.Text.Json
+@using GastroGestionBlazor.Contracts.Ingredientes
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Common
 @inject IngredienteService IngredienteService
-@inject IMapper Mapper
 
 <h3>Ingredientes</h3>
 <hr class="custom-line" />
@@ -16,136 +15,135 @@
 <div class="search-container">
     <div class="form-group">
         <label for="campoBusqueda">Filtrar por:</label>
-        <select id="campoBusqueda" @onchange="OnCampoBusquedaChanged" class="form-control">
-            <option value="Numero_Ingrediente">Número de ingrediente</option>
-            <option value="Nombre_Ingrediente">Nombre</option>
-            <option value="Descripcion_Ingrediente">Descripción</option>
-            <option value="Medida_Ingrediente">Medida</option>
-            <option value="Estado_Ingrediente">Estado</option>
+        <select id="campoBusqueda" class="form-control" disabled title="No disponible aún">
+            <option>Nombre</option>
         </select>
+        <small class="text-muted">No disponible aún</small>
     </div>
     <div class="form-group">
         <label for="valorBusqueda">Valor:</label>
-        <input id="valorBusqueda" @bind="valorBusqueda" class="form-control" />
+        <input id="valorBusqueda" class="form-control" disabled title="No disponible aún" />
     </div>
     <div class="form-group">
-        <button class="btn btn-primary" @onclick="BuscarIngredientes">Buscar</button>
-        <button class="btn btn-secondary" @onclick="LimpiarFiltros">Limpiar filtros</button>
+        <button class="btn btn-secondary" disabled title="No disponible aún">Buscar</button>
+        <small class="text-muted ms-1">No disponible aún</small>
     </div>
 </div>
 
-@if (!string.IsNullOrEmpty(errorMessageBusqueda))
+@if (!string.IsNullOrEmpty(errorMessage))
 {
-    <p class="text-danger">@errorMessageBusqueda</p>
+    <p class="text-danger">@errorMessage</p>
 }
 
 @if (isLoading)
 {
     <p>Cargando...</p>
 }
-else if (!string.IsNullOrEmpty(errorMessage))
+else if (ingredientes.Count == 0)
 {
-    <p class="text-danger">@errorMessage</p>
+    <p class="text-muted">No hay ingredientes registrados.</p>
 }
 else
 {
     <table class="table">
         <thead>
             <tr>
-                <th>Número Ingrediente</th>
                 <th>Nombre</th>
-                <th>Descripción</th>
-                <th>Medida</th>
-                <th>Estado</th>
+                <th>Unidad base</th>
+                <th>Activo</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var ingrediente in ingredientes)
             {
-                <tr>
-                    <td>@ingrediente.Numero_ingrediente</td>
-                    <td>@ingrediente.Nombre_Ingrediente</td>
-                    <td>@ingrediente.Descripcion</td>
-                    <td>@ingrediente.Medida</td>
-                    <td>@ingrediente.Estado</td>
+                <tr class="@(ingrediente.Activo ? "" : "text-muted")">
+                    <td>@ingrediente.Nombre</td>
+                    <td>@ingrediente.UnidadBase</td>
+                    <td>
+                        @if (ingrediente.Activo)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactivo</span>
+                        }
+                    </td>
                     <td class="action-buttons">
-                        <button class="btn btn-info" @onclick="() => VerDetalle(ingrediente)" title="Ver Detalle"><i class="fas fa-eye"></i></button>
-                        <button class="btn btn-info" @onclick="() => EditarIngrediente(ingrediente)" title="Editar Ingrediente"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-info" @onclick="() => EliminarIngrediente(ingrediente)" title="Eliminar Ingrediente"><i class="fas fa-trash"></i></button>
+                        <button class="btn btn-info btn-sm" @onclick="() => VerDetalle(ingrediente)" title="Ver Detalle"><i class="fas fa-eye"></i></button>
+                        <button class="btn btn-secondary btn-sm" disabled title="No disponible aún"><i class="fas fa-edit"></i></button>
+                        <small class="text-muted">No disponible aún</small>
+                        <button class="btn btn-secondary btn-sm" disabled title="No disponible aún"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
             }
         </tbody>
     </table>
 
-    @if (ingredienteSeleccionado != null && !isEditing)
+    @if (ingredienteSeleccionado != null)
     {
         <h3>Detalle del ingrediente</h3>
         <div class="detail-container">
             <div class="detail-item">
-                <label>Número de ingrediente:</label>
-                <input value="@ingredienteSeleccionado.Numero_ingrediente" disabled />
-            </div>
-            <div class="detail-item">
                 <label>Nombre:</label>
-                <input value="@ingredienteSeleccionado.Nombre_Ingrediente" disabled />
+                <input value="@ingredienteSeleccionado.Nombre" disabled />
             </div>
             <div class="detail-item">
-                <label>Descripción:</label>
-                <input value="@ingredienteSeleccionado.Descripcion" disabled />
-            </div>
-            <div class="detail-item">
-                <label>Medida:</label>
-                <input value="@ingredienteSeleccionado.Medida" disabled />
+                <label>Unidad base:</label>
+                <input value="@ingredienteSeleccionado.UnidadBase" disabled />
             </div>
             <div class="detail-item">
                 <label>Estado:</label>
-                <input value="@(ingredienteSeleccionado.Estado ? "Activo" : "Inactivo")" disabled />
+                <input value="@(ingredienteSeleccionado.Activo ? "Activo" : "Inactivo")" disabled />
             </div>
-        </div>
-    }
-
-    @if (isEditing)
-    {
-        <h3>@(ingredienteSeleccionado == null ? "Agregar ingrediente" : "Editar ingrediente")</h3>
-        <div class="detail-container">
-            <div class="detail-item">
-                <label>Nombre:</label>
-                <input @bind="ingredienteSeleccionado.Nombre_Ingrediente" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Descripción:</label>
-                <input @bind="ingredienteSeleccionado.Descripcion" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Medida:</label>
-                <input @bind="ingredienteSeleccionado.Medida" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Estado:</label>
-                <input @bind="ingredienteSeleccionado.Estado" class="form-control" />
-            </div>
-            <div class="form-actions">
-                <button class="btn btn-primary" @onclick="GuardarIngrediente">Guardar</button>
-                <button class="btn btn-secondary" @onclick="CancelarEdicion">Cancelar</button>
+            <div class="mt-3">
+                <button class="btn btn-secondary" @onclick="CerrarDetalle">Cerrar</button>
             </div>
         </div>
     }
 }
 
-<div class="footer-spacing"></div>
+@if (showCreateForm)
+{
+    <h3>Nuevo ingrediente</h3>
+    @if (!string.IsNullOrEmpty(createErrorMessage))
+    {
+        <p class="text-danger">@createErrorMessage</p>
+    }
+    <div class="detail-container">
+        <div class="detail-item">
+            <label>Nombre: <span class="text-danger">*</span></label>
+            <input @bind="nuevoIngrediente.Nombre" class="form-control" />
+        </div>
+        <div class="detail-item">
+            <label>Unidad base: <span class="text-danger">*</span></label>
+            <select @bind="nuevoIngrediente.UnidadBase" class="form-control">
+                @foreach (var valor in Enum.GetValues<UnidadDeMedida>())
+                {
+                    <option value="@valor">@valor</option>
+                }
+            </select>
+        </div>
+        <div class="mt-3">
+            <button class="btn btn-primary" @onclick="GuardarIngrediente" disabled="@isSaving">
+                @(isSaving ? "Guardando..." : "Guardar")
+            </button>
+            <button class="btn btn-secondary ms-2" @onclick="CancelarCreacion">Cancelar</button>
+        </div>
+    </div>
+    <div class="footer-spacing"></div>
+}
 
 @code {
-    private List<IngredienteToListDTO> ingredientes;
-    private IngredienteToListDTO ingredienteSeleccionado;
-    private IngredienteCreacionDTO nuevoIngrediente;
-    private string campoBusqueda = "Numero_Ingrediente";
-    private string valorBusqueda;
+    private List<IngredienteResponse> ingredientes = new();
+    private IngredienteResponse? ingredienteSeleccionado;
+    private NuevoIngredienteModel nuevoIngrediente = new();
     private bool isLoading = true;
-    private string errorMessage;
-    private string errorMessageBusqueda;
-    private bool isEditing = false;
+    private bool showCreateForm = false;
+    private bool isSaving = false;
+    private string? errorMessage;
+    private string? createErrorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -158,7 +156,7 @@ else
         {
             isLoading = true;
             errorMessage = null;
-            ingredientes = await IngredienteService.GetAllIngredientesAsync();
+            ingredientes = await IngredienteService.GetAllAsync();
         }
         catch (Exception ex)
         {
@@ -170,102 +168,69 @@ else
         }
     }
 
-    private void OnCampoBusquedaChanged(ChangeEventArgs e)
+    private void VerDetalle(IngredienteResponse ingrediente)
     {
-        campoBusqueda = e.Value.ToString();
+        ingredienteSeleccionado = ingrediente;
+        showCreateForm = false;
     }
 
-    private async Task BuscarIngredientes()
+    private void CerrarDetalle()
     {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(valorBusqueda))
-            {
-                errorMessageBusqueda = "Por favor, complete el campo de búsqueda.";
-                return;
-            }
-
-            isLoading = true;
-            errorMessageBusqueda = null;
-            ingredientes = await IngredienteService.BuscarIngredienteAsync(campoBusqueda, valorBusqueda);
-        }
-        catch (Exception ex)
-        {
-            errorMessageBusqueda = ex.Message;
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
-
-    private async Task LimpiarFiltros()
-    {
-        valorBusqueda = string.Empty;
-        errorMessageBusqueda = string.Empty;
         ingredienteSeleccionado = null;
-        isEditing = false;
-        await CargarIngredientes();
-    }
-
-    private void VerDetalle(IngredienteToListDTO ingrediente)
-    {
-        ingredienteSeleccionado = ingrediente;
-        isEditing = false;
-    }
-
-    private void EditarIngrediente(IngredienteToListDTO ingrediente)
-    {
-        ingredienteSeleccionado = ingrediente;
-        isEditing = true;
     }
 
     private void AgregarNuevoIngrediente()
     {
-        ingredienteSeleccionado = new IngredienteToListDTO();
-        isEditing = true;
+        nuevoIngrediente = new NuevoIngredienteModel();
+        createErrorMessage = null;
+        showCreateForm = true;
+        ingredienteSeleccionado = null;
     }
 
     private async Task GuardarIngrediente()
     {
+        if (string.IsNullOrWhiteSpace(nuevoIngrediente.Nombre))
+        {
+            createErrorMessage = "El nombre es requerido.";
+            return;
+        }
+
         try
         {
-            if (ingredienteSeleccionado.Id_Ingrediente == Guid.Empty)
-            {
-                // Crear nuevo ingrediente
-                var ingredienteCreacionDTO = Mapper.Map<IngredienteCreacionDTO>(ingredienteSeleccionado);
-                await IngredienteService.AgregarIngredienteAsync(ingredienteCreacionDTO);
-            }
-            else
-            {
-                // Editar ingrediente existente
-                await IngredienteService.EditarIngredienteAsync(Mapper.Map<IngredienteEdicionDTO>(ingredienteSeleccionado));
-            }
+            isSaving = true;
+            createErrorMessage = null;
+            var request = new CrearIngredienteRequest(
+                nuevoIngrediente.Nombre,
+                nuevoIngrediente.UnidadBase);
+
+            await IngredienteService.CreateAsync(request);
+            showCreateForm = false;
             await CargarIngredientes();
-            isEditing = false;
+        }
+        catch (ApiException ex)
+        {
+            createErrorMessage = ex.Message;
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            createErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
         }
     }
 
-    private void CancelarEdicion()
+    private void CancelarCreacion()
     {
-        ingredienteSeleccionado = null;
-        isEditing = false;
+        showCreateForm = false;
+        createErrorMessage = null;
     }
 
-    private async Task EliminarIngrediente(IngredienteToListDTO ingrediente)
+    // Mutable view-model for the create form (records are immutable)
+    private class NuevoIngredienteModel
     {
-        try
-        {
-            await IngredienteService.EliminarIngredienteAsync(Mapper.Map<IngredienteEdicionDTO>(ingrediente));
-            await CargarIngredientes();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = ex.Message;
-        }
+        public string Nombre { get; set; } = string.Empty;
+        public UnidadDeMedida UnidadBase { get; set; } = UnidadDeMedida.Unidad;
     }
 }

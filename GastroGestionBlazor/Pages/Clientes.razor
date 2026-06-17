@@ -1,10 +1,9 @@
-﻿@page "/clientes"
+@page "/clientes"
 
-@using DTO
-@using DTO.Cliente
-@using System.Text.Json
+@using GastroGestionBlazor.Contracts.Clientes
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Common
 @inject ClienteService ClienteService
-@inject IMapper Mapper
 
 <h3>Clientes</h3>
 <hr class="custom-line" />
@@ -16,46 +15,33 @@
 <div class="search-container">
     <div class="form-group">
         <label for="campoBusqueda">Filtrar por:</label>
-        <select id="campoBusqueda" @onchange="OnCampoBusquedaChanged" class="form-control">
-            <option value="Nombre_Cliente">Nombre</option>
-            <option value="Apellido_Cliente">Apellido</option>
-            <option value="Numero_Cliente">Número de cliente</option>
-            <option value="Nro_Doc_Cliente">Número de documento</option>
-            <option value="Estado_Cliente">Estado</option>
+        <select id="campoBusqueda" class="form-control" disabled title="No disponible aún">
+            <option>Nombre</option>
         </select>
+        <small class="text-muted">No disponible aún</small>
     </div>
     <div class="form-group">
         <label for="valorBusqueda">Valor:</label>
-        @if (campoBusqueda == "Estado_Cliente")
-        {
-            <select id="valorBusqueda" @bind="valorBusqueda" class="form-control">
-                <option value="Activo">Activo</option>
-                <option value="Inactivo">Inactivo</option>
-            </select>
-        }
-        else
-        {
-            <input id="valorBusqueda" @bind="valorBusqueda" class="form-control" />
-        }
+        <input id="valorBusqueda" class="form-control" disabled title="No disponible aún" />
     </div>
     <div class="form-group">
-        <button class="btn btn-primary" @onclick="BuscarClientes">Buscar</button>
-        <button class="btn btn-secondary" @onclick="LimpiarFiltros">Limpiar filtros</button>
+        <button class="btn btn-secondary" disabled title="No disponible aún">Buscar</button>
+        <small class="text-muted ms-1">No disponible aún</small>
     </div>
 </div>
 
-@if (!string.IsNullOrEmpty(errorMessageBusqueda))
+@if (!string.IsNullOrEmpty(errorMessage))
 {
-    <p class="text-danger">@errorMessageBusqueda</p>
+    <p class="text-danger">@errorMessage</p>
 }
 
 @if (isLoading)
 {
     <p>Cargando...</p>
 }
-else if (!string.IsNullOrEmpty(errorMessage))
+else if (clientes.Count == 0)
 {
-    <p class="text-danger">@errorMessage</p>
+    <p class="text-muted">No hay clientes registrados.</p>
 }
 else
 {
@@ -63,162 +49,122 @@ else
         <thead>
             <tr>
                 <th>Nombre</th>
-                <th>Apellido</th>
+                <th>Condición IVA</th>
+                <th>CUIT</th>
                 <th>Email</th>
-                <th>Número cliente</th>
-                <th>Nro doc</th>
-                <th>Tipo doc</th>
-                <th>Estado civil</th>
-                <th>Fecha nacimiento</th>
-                <th>Sexo</th>
-                <th>Nacionalidad</th>
-                <th>Fecha alta</th>
-                <th>Estado</th>
+                <th>Activo</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var cliente in clientes)
             {
-                <tr>
-
+                <tr class="@(cliente.Activo ? "" : "text-muted")">
                     <td>@cliente.Nombre</td>
-                    <td>@cliente.Apellido</td>
+                    <td>@cliente.CondicionIVA</td>
+                    <td>@cliente.Cuit</td>
                     <td>@cliente.Email</td>
-                    <td>@cliente.Numero_Cliente</td>
-                    <td>@(cliente.Nro_Doc.HasValue ? cliente.Nro_Doc.ToString() : string.Empty)</td>
-                    <td>@cliente.Tipo_Doc</td>
-                    <td>@cliente.Estado_Civil</td>
-                    <td>@cliente.Fecha_Nacimiento?.ToString("dd/MM/yyyy")</td>
-                    <td>@cliente.Sexo</td>
-                    <td>@cliente.Nacionalidad</td>
-                    <td>@cliente.Fecha_Alta_Cliente.ToString("dd/MM/yyyy")</td>
-                    <td>@(cliente.Estado ? "Activo" : "Inactivo")</td>
+                    <td>
+                        @if (cliente.Activo)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactivo</span>
+                        }
+                    </td>
                     <td class="action-buttons">
-                        <button class="btn btn-info" @onclick="() => VerDetalle(cliente)" title="Ver Detalle"><i class="fas fa-eye"></i></button>
-                        <button class="btn btn-info" @onclick="() => EditarCliente(cliente)" title="Editar Cliente"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-info" @onclick="() => EliminarCliente(cliente)" title="Eliminar Cliente"><i class="fas fa-trash"></i></button>
+                        <button class="btn btn-info btn-sm" @onclick="() => VerDetalle(cliente)" title="Ver Detalle"><i class="fas fa-eye"></i></button>
+                        <button class="btn btn-secondary btn-sm" disabled title="No disponible aún"><i class="fas fa-edit"></i></button>
+                        <small class="text-muted">No disponible aún</small>
+                        <button class="btn btn-secondary btn-sm" disabled title="No disponible aún"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
             }
         </tbody>
     </table>
 
-    @if (clienteSeleccionado != null && !isEditing)
+    @if (clienteSeleccionado != null)
     {
         <h3>Detalle del cliente</h3>
         <div class="detail-container">
-            <div class="detail-item">
-                <label>Número de cliente:</label>
-                <input value="@clienteSeleccionado.Numero_Cliente" disabled />
-            </div>
             <div class="detail-item">
                 <label>Nombre:</label>
                 <input value="@clienteSeleccionado.Nombre" disabled />
             </div>
             <div class="detail-item">
-                <label>Apellido:</label>
-                <input value="@clienteSeleccionado.Apellido" disabled />
+                <label>Condición IVA:</label>
+                <input value="@clienteSeleccionado.CondicionIVA" disabled />
+            </div>
+            <div class="detail-item">
+                <label>CUIT:</label>
+                <input value="@clienteSeleccionado.Cuit" disabled />
             </div>
             <div class="detail-item">
                 <label>Email:</label>
                 <input value="@clienteSeleccionado.Email" disabled />
             </div>
             <div class="detail-item">
-                <label>Tipo doc:</label>
-                <input value="@clienteSeleccionado.Tipo_Doc" disabled />
-            </div>
-            <div class="detail-item">
-                <label>Nro doc:</label>
-                <input value="@clienteSeleccionado.Nro_Doc" disabled />
-            </div>
-            <div class="detail-item">
-                <label>Fecha nacimiento:</label>
-                <input value="@clienteSeleccionado.Fecha_Nacimiento?.ToString("dd/MM/yyyy")" disabled />
-            </div>
-            <div class="detail-item">
-                <label>Estado civil:</label>
-                <input value="@clienteSeleccionado.Estado_Civil" disabled />
-            </div>
-            <div class="detail-item">
-                <label>Sexo:</label>
-                <input value="@clienteSeleccionado.Sexo" disabled />
-            </div>
-            <div class="detail-item">
-                <label>Nacionalidad:</label>
-                <input value="@clienteSeleccionado.Nacionalidad" disabled />
-            </div>
-            <div class="detail-item">
-                <label>Fecha alta:</label>
-                <input value="@clienteSeleccionado.Fecha_Alta_Cliente.ToString("dd/MM/yyyy")" disabled />
-            </div>
-            <div class="detail-item">
                 <label>Estado:</label>
-                <input value="@(clienteSeleccionado.Estado ? "Activo" : "Inactivo")" disabled />
-            </div>
-        </div>
-        <div class="footer-spacing"></div>
-    }
-
-    @if (isEditing)
-    {
-        <h3>@(clienteSeleccionado == null ? "Agregar cliente" : "Editar cliente")</h3>
-        <div class="detail-container">
-            <div class="detail-item">
-                <label>Nombre:</label>
-                <input @bind="clienteSeleccionado.Nombre" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Apellido:</label>
-                <input @bind="clienteSeleccionado.Apellido" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Email:</label>
-                <input @bind="clienteSeleccionado.Email" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Tipo doc:</label>
-                <input @bind="clienteSeleccionado.Tipo_Doc" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Nro doc:</label>
-                <input @bind="clienteSeleccionado.Nro_Doc" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Fecha nacimiento:</label>
-                <input @bind="clienteSeleccionado.Fecha_Nacimiento" type="date" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Estado civil:</label>
-                <input @bind="clienteSeleccionado.Estado_Civil" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Sexo:</label>
-                <input @bind="clienteSeleccionado.Sexo" class="form-control" />
-            </div>
-            <div class="detail-item">
-                <label>Nacionalidad:</label>
-                <input @bind="clienteSeleccionado.Nacionalidad" class="form-control" />
+                <input value="@(clienteSeleccionado.Activo ? "Activo" : "Inactivo")" disabled />
             </div>
             <div class="mt-3">
-                <button class="btn btn-primary" @onclick="GuardarCliente">Guardar</button>
-                <button class="btn btn-secondary" @onclick="CancelarEdicion">Cancelar</button>
+                <button class="btn btn-secondary" @onclick="CerrarDetalle">Cerrar</button>
             </div>
         </div>
         <div class="footer-spacing"></div>
     }
 }
 
+@if (showCreateForm)
+{
+    <h3>Nuevo cliente</h3>
+    @if (!string.IsNullOrEmpty(createErrorMessage))
+    {
+        <p class="text-danger">@createErrorMessage</p>
+    }
+    <div class="detail-container">
+        <div class="detail-item">
+            <label>Nombre: <span class="text-danger">*</span></label>
+            <input @bind="nuevoCliente.Nombre" class="form-control" />
+        </div>
+        <div class="detail-item">
+            <label>Condición IVA: <span class="text-danger">*</span></label>
+            <select @bind="nuevoCliente.CondicionIVA" class="form-control">
+                @foreach (var valor in Enum.GetValues<CondicionIVA>())
+                {
+                    <option value="@valor">@valor</option>
+                }
+            </select>
+        </div>
+        <div class="detail-item">
+            <label>CUIT:</label>
+            <input @bind="nuevoCliente.Cuit" class="form-control" />
+        </div>
+        <div class="detail-item">
+            <label>Email:</label>
+            <input @bind="nuevoCliente.Email" class="form-control" />
+        </div>
+        <div class="mt-3">
+            <button class="btn btn-primary" @onclick="GuardarCliente" disabled="@isSaving">
+                @(isSaving ? "Guardando..." : "Guardar")
+            </button>
+            <button class="btn btn-secondary ms-2" @onclick="CancelarCreacion">Cancelar</button>
+        </div>
+    </div>
+    <div class="footer-spacing"></div>
+}
+
 @code {
-    private List<ClienteToListDTO> clientes;
-    private ClienteToListDTO clienteSeleccionado;
-    private ClienteCreacionDTO nuevoCliente;
-    private string campoBusqueda = "Nombre_Cliente";
-    private string valorBusqueda;
+    private List<ClienteResponse> clientes = new();
+    private ClienteResponse? clienteSeleccionado;
+    private NuevoClienteModel nuevoCliente = new();
     private bool isLoading = true;
-    private string errorMessage;
-    private string errorMessageBusqueda;
-    private bool isEditing = false;
+    private bool showCreateForm = false;
+    private bool isSaving = false;
+    private string? errorMessage;
+    private string? createErrorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -231,7 +177,7 @@ else
         {
             isLoading = true;
             errorMessage = null;
-            clientes = await ClienteService.GetAllClientesAsync();
+            clientes = await ClienteService.GetAllAsync();
         }
         catch (Exception ex)
         {
@@ -243,99 +189,73 @@ else
         }
     }
 
-    private void OnCampoBusquedaChanged(ChangeEventArgs e)
+    private void VerDetalle(ClienteResponse cliente)
     {
-        campoBusqueda = e.Value.ToString();
+        clienteSeleccionado = cliente;
+        showCreateForm = false;
     }
 
-    private async Task BuscarClientes()
+    private void CerrarDetalle()
     {
-        try
-        {
-            isLoading = true;
-            errorMessageBusqueda = null;
-            clientes = await ClienteService.BuscarClientesAsync(campoBusqueda, valorBusqueda);
-        }
-        catch (Exception ex)
-        {
-            errorMessageBusqueda = ex.Message;
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
-
-    private async Task LimpiarFiltros()
-    {
-        valorBusqueda = string.Empty;
-        errorMessageBusqueda = string.Empty;
         clienteSeleccionado = null;
-        isEditing = false;
-        await CargarClientes();
-    }
-
-    private void VerDetalle(ClienteToListDTO cliente)
-    {
-        clienteSeleccionado = cliente;
-        isEditing = false;
-    }
-
-    private void EditarCliente(ClienteToListDTO cliente)
-    {
-        clienteSeleccionado = cliente;
-        isEditing = true;
     }
 
     private void AgregarNuevoCliente()
     {
-        clienteSeleccionado = new ClienteToListDTO();
-        isEditing = true;
+        nuevoCliente = new NuevoClienteModel();
+        createErrorMessage = null;
+        showCreateForm = true;
+        clienteSeleccionado = null;
     }
 
     private async Task GuardarCliente()
     {
+        if (string.IsNullOrWhiteSpace(nuevoCliente.Nombre))
+        {
+            createErrorMessage = "El nombre es requerido.";
+            return;
+        }
+
         try
         {
-            if (clienteSeleccionado.Id_Cliente == Guid.Empty)
-            {
-                // Crear nuevo cliente
-                var clienteCreacionDTO = Mapper.Map<ClienteCreacionDTO>(clienteSeleccionado);
-                await ClienteService.AgregarClienteAsync(clienteCreacionDTO);
-            }
-            else
-            {
-                // Editar cliente existente
-                await ClienteService.EditarClienteAsync(Mapper.Map<ClienteEdicionDTO>(clienteSeleccionado));
-            }
+            isSaving = true;
+            createErrorMessage = null;
+            var request = new CrearClienteRequest(
+                nuevoCliente.Nombre,
+                nuevoCliente.CondicionIVA,
+                string.IsNullOrWhiteSpace(nuevoCliente.Cuit) ? null : nuevoCliente.Cuit,
+                string.IsNullOrWhiteSpace(nuevoCliente.Email) ? null : nuevoCliente.Email);
+
+            await ClienteService.CreateAsync(request);
+            showCreateForm = false;
             await CargarClientes();
-            isEditing = false;
+        }
+        catch (ApiException ex)
+        {
+            createErrorMessage = ex.Message;
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            createErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
         }
     }
 
-    private void CancelarEdicion()
+    private void CancelarCreacion()
     {
-        clienteSeleccionado = null;
-        isEditing = false;
+        showCreateForm = false;
+        createErrorMessage = null;
     }
 
-    private async Task EliminarCliente(ClienteToListDTO cliente)
+    // Mutable view-model for the create form (records are immutable)
+    private class NuevoClienteModel
     {
-        try
-        {
-            // Implementa la lógica para eliminar el cliente aquí
-            // await ClienteService.EliminarClienteAsync(cliente.Id_Cliente);
-
-            await ClienteService.EliminarClienteAsync(Mapper.Map < ClienteEdicionDTO >(cliente));
-            await CargarClientes();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = ex.Message;
-        }
+        public string Nombre { get; set; } = string.Empty;
+        public CondicionIVA CondicionIVA { get; set; } = CondicionIVA.ConsumidorFinal;
+        public string? Cuit { get; set; }
+        public string? Email { get; set; }
     }
 }
