@@ -1,0 +1,261 @@
+@page "/ordenes-trabajo"
+@attribute [Authorize(Roles = "Cocinero,Administrador")]
+@implements IAsyncDisposable
+
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Common
+@using GastroGestionBlazor.Options
+
+@inject KitchenBoardService BoardService
+@inject ApiOptions ApiOptions
+@inject IAuthService AuthService
+
+<h3>Cocina — Tablero de órdenes de trabajo</h3>
+<hr class="custom-line" />
+
+@* Connection status badge *@
+<div class="mb-3">
+    @if (_connState == HubConnectionState.Connected)
+    {
+        <span class="badge bg-success">Conectado</span>
+    }
+    else if (_connState == HubConnectionState.Reconnecting)
+    {
+        <span class="badge bg-warning text-dark">Reconectando&hellip;</span>
+    }
+    else
+    {
+        <span class="badge bg-danger">Desconectado</span>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible" role="alert">
+        @_errorMessage
+        <button type="button" class="btn-close" @onclick="DismissError" aria-label="Cerrar"></button>
+    </div>
+}
+
+@if (_isLoading)
+{
+    <p>Cargando tablero&hellip;</p>
+}
+else if (ActiveItems.Count == 0)
+{
+    <p class="text-muted">No hay órdenes de trabajo activas.</p>
+}
+else
+{
+    <div class="row">
+        @* Column: Pendientes (Creada) *@
+        <div class="col-md-4">
+            <h5 class="text-secondary">Pendientes</h5>
+            <hr />
+            @foreach (var item in ActiveItems.Where(i => i.Estado == EstadoOT.Creada))
+            {
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <p class="card-text mb-1">Pedido: @item.PedidoId.ToString()[..8]&hellip;</p>
+                        <p class="card-text mb-1">OT: @item.OtId.ToString()[..8]&hellip;</p>
+                        <p class="card-text mb-1">Tipo: @GetTipoPedidoLabel(item.PedidoTipo)</p>
+                        @if (item.CocineroAsignadoLegajoId.HasValue)
+                        {
+                            <p class="card-text mb-1 text-muted small">Cocinero: @item.CocineroAsignadoLegajoId.Value.ToString()[..8]&hellip;</p>
+                        }
+                    </div>
+                </div>
+            }
+            @if (!ActiveItems.Any(i => i.Estado == EstadoOT.Creada))
+            {
+                <p class="text-muted small">Sin órdenes pendientes.</p>
+            }
+        </div>
+
+        @* Column: En preparación (Preparandose) *@
+        <div class="col-md-4">
+            <h5 class="text-warning">En preparación</h5>
+            <hr />
+            @foreach (var item in ActiveItems.Where(i => i.Estado == EstadoOT.Preparandose))
+            {
+                <div class="card mb-2 border-warning">
+                    <div class="card-body">
+                        <p class="card-text mb-1">Pedido: @item.PedidoId.ToString()[..8]&hellip;</p>
+                        <p class="card-text mb-1">OT: @item.OtId.ToString()[..8]&hellip;</p>
+                        <p class="card-text mb-1">Tipo: @GetTipoPedidoLabel(item.PedidoTipo)</p>
+                        @if (item.CocineroAsignadoLegajoId.HasValue)
+                        {
+                            <p class="card-text mb-1 text-muted small">Cocinero: @item.CocineroAsignadoLegajoId.Value.ToString()[..8]&hellip;</p>
+                        }
+                        <button class="btn btn-success btn-sm mt-2"
+                                @onclick="() => OnMarcarLista(item)"
+                                disabled="@_marking.Contains(item.OtId)">
+                            @(_marking.Contains(item.OtId) ? "Marcando..." : "Marcar lista")
+                        </button>
+                    </div>
+                </div>
+            }
+            @if (!ActiveItems.Any(i => i.Estado == EstadoOT.Preparandose))
+            {
+                <p class="text-muted small">Sin órdenes en preparación.</p>
+            }
+        </div>
+
+        @* Column: Listas (Lista) *@
+        <div class="col-md-4">
+            <h5 class="text-success">Listas</h5>
+            <hr />
+            @foreach (var item in ActiveItems.Where(i => i.Estado == EstadoOT.Lista))
+            {
+                <div class="card mb-2 border-success">
+                    <div class="card-body">
+                        <p class="card-text mb-1">Pedido: @item.PedidoId.ToString()[..8]&hellip;</p>
+                        <p class="card-text mb-1">OT: @item.OtId.ToString()[..8]&hellip;</p>
+                        <p class="card-text mb-1">Tipo: @GetTipoPedidoLabel(item.PedidoTipo)</p>
+                        @if (item.CocineroAsignadoLegajoId.HasValue)
+                        {
+                            <p class="card-text mb-1 text-muted small">Cocinero: @item.CocineroAsignadoLegajoId.Value.ToString()[..8]&hellip;</p>
+                        }
+                    </div>
+                </div>
+            }
+            @if (!ActiveItems.Any(i => i.Estado == EstadoOT.Lista))
+            {
+                <p class="text-muted small">Sin órdenes listas.</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<OrdenTrabajoBoardItem> _items = new();
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private HashSet<Guid> _marking = new();
+    private KitchenRealtimeConnection? _conn;
+    private HubConnectionState _connState = HubConnectionState.Disconnected;
+
+    // Computed: visible items excluding Cancelada
+    private List<OrdenTrabajoBoardItem> ActiveItems =>
+        _items.Where(i => i.Estado != EstadoOT.Cancelada).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _items = await BoardService.GetBoardAsync();
+
+            _conn = new KitchenRealtimeConnection(ApiOptions, AuthService);
+            await _conn.StartAsync(OnOtChanged, ReHydrateAsync, OnConnStateChanged);
+
+            // Reflect initial connected state after StartAsync completes.
+            _connState = _conn.State;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_conn is not null)
+        {
+            await _conn.DisposeAsync();
+        }
+    }
+
+    // CRITICAL: OtChanged fires off the Blazor render thread — must use InvokeAsync
+    // to marshal the state mutation and StateHasChanged onto the UI thread.
+    private void OnOtChanged(OrdenTrabajoBoardItem item)
+    {
+        _ = InvokeAsync(() =>
+        {
+            _items.RemoveAll(x => x.OtId == item.OtId);
+
+            if (item.Estado != EstadoOT.Cancelada)
+            {
+                _items.Add(item);
+            }
+
+            // Echo arrived — unblock the Marcar lista button for this OT.
+            _marking.Remove(item.OtId);
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task ReHydrateAsync()
+    {
+        // Runs on the SignalR Reconnected callback thread. Marshal the state mutation
+        // onto the render thread too (correct-by-construction regardless of hosting model).
+        List<OrdenTrabajoBoardItem> board;
+        string? error = null;
+        try
+        {
+            board = await BoardService.GetBoardAsync();
+        }
+        catch (Exception ex)
+        {
+            board = _items;
+            error = ex.Message;
+        }
+
+        await InvokeAsync(() =>
+        {
+            _items = board;
+            if (error is not null) _errorMessage = error;
+            StateHasChanged();
+        });
+    }
+
+    private void OnConnStateChanged()
+    {
+        _connState = _conn?.State ?? HubConnectionState.Disconnected;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnMarcarLista(OrdenTrabajoBoardItem item)
+    {
+        if (_marking.Contains(item.OtId))
+            return;
+
+        _marking.Add(item.OtId);
+        _errorMessage = null;
+
+        try
+        {
+            await BoardService.MarcarListaAsync(item.PedidoId, item.OtId);
+            // Echo-driven: button stays disabled until OtChanged echo arrives and removes from _marking.
+        }
+        catch (ApiException ex)
+        {
+            _errorMessage = ex.Message;
+            _marking.Remove(item.OtId);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _marking.Remove(item.OtId);
+        }
+    }
+
+    private void DismissError()
+    {
+        _errorMessage = null;
+    }
+
+    private static string GetTipoPedidoLabel(TipoPedido tipo) => tipo switch
+    {
+        TipoPedido.Salon    => "Salón",
+        TipoPedido.TakeAway => "TakeAway",
+        TipoPedido.Delivery => "Delivery",
+        _                   => tipo.ToString()
+    };
+}
