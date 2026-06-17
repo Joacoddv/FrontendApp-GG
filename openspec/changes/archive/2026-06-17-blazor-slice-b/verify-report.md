@@ -1,4 +1,4 @@
-﻿# Verification Report - blazor-slice-b
+# Verification Report - blazor-slice-b
 
 **Change**: blazor-slice-b
 **Branch**: feat/blazor-slice-b
