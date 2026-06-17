@@ -1,120 +1,74 @@
-﻿using DTO.Cliente;
-using System.Net.Http;
+using GastroGestionBlazor.Contracts.Clientes;
+using GastroGestionBlazor.Contracts.Common;
 using System.Net.Http.Json;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Text.Json;
-using System;
+using System.Text.Json.Serialization;
 
 public class ClienteService
 {
     private readonly HttpClient _httpClient;
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public ClienteService(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
-    public async Task<List<ClienteToListDTO>> GetAllClientesAsync()
+    public async Task<List<ClienteResponse>> GetAllAsync()
     {
-        try
-        {
-            var response = await _httpClient.GetAsync("https://localhost:5001/api/Cliente");
-            response.EnsureSuccessStatusCode();
-            var responseContent = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<List<ClienteToListDTO>>(responseContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        }
-        catch (HttpRequestException httpEx)
-        {
-            var responseContent = httpEx.Data.Contains("ResponseContent") ? httpEx.Data["ResponseContent"].ToString() : "Sin contenido";
-            throw new Exception($"Error al obtener los clientes: {responseContent}");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error al procesar la solicitud: {ex.Message}");
-        }
+        var response = await _httpClient.GetAsync("clientes");
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<List<ClienteResponse>>(JsonOptions);
+        return result ?? new List<ClienteResponse>();
     }
 
-    public async Task<List<ClienteToListDTO>> BuscarClientesAsync(string campoBusqueda, string valorBusqueda)
+    public async Task<ClienteResponse?> GetByIdAsync(Guid id)
     {
-        try
+        var response = await _httpClient.GetAsync($"clientes/{id}");
+        if (!response.IsSuccessStatusCode)
+            return null;
+        return await response.Content.ReadFromJsonAsync<ClienteResponse>(JsonOptions);
+    }
+
+    public async Task<Guid> CreateAsync(CrearClienteRequest request)
+    {
+        var response = await _httpClient.PostAsJsonAsync("clientes", request, JsonOptions);
+
+        if (!response.IsSuccessStatusCode)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:5001/api/cliente/Buscar?campoBusqueda={campoBusqueda}&valorBusqueda={valorBusqueda}");
-            if (!response.IsSuccessStatusCode)
+            ProblemDetailsResponse? problem = null;
+            try
             {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                throw new Exception($"Error al buscar los clientes: {responseContent}");
+                problem = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(JsonOptions);
             }
+            catch { /* ignore deserialization errors */ }
 
-            var responseContentSuccess = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<List<ClienteToListDTO>>(responseContentSuccess, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var message = problem?.Detail ?? problem?.Title ?? "Error al crear el cliente.";
+            throw new ApiException(message);
         }
-        catch (HttpRequestException httpEx)
-        {
-            var responseContent = httpEx.Data.Contains("ResponseContent") ? httpEx.Data["ResponseContent"].ToString() : "Sin contenido";
-            throw new Exception($"Error al buscar los clientes: {responseContent}");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error al procesar la solicitud: {ex.Message}");
-        }
-    }
 
-    public async Task AgregarClienteAsync(ClienteCreacionDTO nuevoCliente)
-    {
+        // Try to read the Guid from the response body first
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:5001/api/Cliente/Alta", nuevoCliente);
-            response.EnsureSuccessStatusCode();
+            var id = await response.Content.ReadFromJsonAsync<Guid>(JsonOptions);
+            if (id != Guid.Empty)
+                return id;
         }
-        catch (HttpRequestException httpEx)
-        {
-            var responseContent = httpEx.Data.Contains("ResponseContent") ? httpEx.Data["ResponseContent"].ToString() : "Sin contenido";
-            throw new Exception($"Error al agregar el cliente: {responseContent}");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error al procesar la solicitud: {ex.Message}");
-        }
-    }
+        catch { /* body may not be a bare Guid */ }
 
-    public async Task EditarClienteAsync(ClienteEdicionDTO clienteEditado)
-    {
-        try
+        // Fall back to Location header
+        if (response.Headers.Location is { } location)
         {
-            var response = await _httpClient.PutAsJsonAsync("https://localhost:5001/api/Cliente/Editar", clienteEditado);
-            response.EnsureSuccessStatusCode();
+            var segments = location.AbsolutePath.Split('/');
+            if (Guid.TryParse(segments[^1], out var locationId))
+                return locationId;
         }
-        catch (HttpRequestException httpEx)
-        {
-            var responseContent = httpEx.Data.Contains("ResponseContent") ? httpEx.Data["ResponseContent"].ToString() : "Sin contenido";
-            throw new Exception($"Error al editar el cliente: {responseContent}");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error al procesar la solicitud: {ex.Message}");
-        }
-    }
 
-    public async Task EliminarClienteAsync(ClienteEdicionDTO clienteEditado)
-    {
-        try
-        {
-            var request = new HttpRequestMessage(HttpMethod.Delete, "https://localhost:5001/api/Cliente/Baja")
-            {
-                Content = JsonContent.Create(clienteEditado)
-            };
-            var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-        }
-        catch (HttpRequestException httpEx)
-        {
-            var responseContent = httpEx.Data.Contains("ResponseContent") ? httpEx.Data["ResponseContent"].ToString() : "Sin contenido";
-            throw new Exception($"Error al eliminar el cliente: {responseContent}");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error al procesar la solicitud: {ex.Message}");
-        }
+        // Fall back to empty Guid (caller will reload the list)
+        return Guid.Empty;
     }
 }
