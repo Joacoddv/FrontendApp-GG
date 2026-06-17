@@ -1,4 +1,7 @@
-﻿<nav class="sidebar">
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<nav class="sidebar">
     <div class="sidebar-header">
         <img src="images/GastroGestionpeque-removebg-preview-Blanco.png" alt="Logo" class="logo" />
     </div>
@@ -21,6 +24,21 @@
         <li class="nav-item">
             <NavLink class="nav-link" href="menu">Menu</NavLink>
         </li>
+        @* Kitchen board — gated to Cocinero and Administrador roles. BAF-08.
+           The actual board page is implemented in Slice C; this entry is nav-only. *@
+        <AuthorizeView Roles="Cocinero,Administrador">
+            <li class="nav-item">
+                <NavLink class="nav-link" href="ordenes-trabajo">Cocina</NavLink>
+            </li>
+        </AuthorizeView>
     </ul>
-    <button class="btn btn-danger logout-btn">Cerrar sesión</button>
+    <button class="btn btn-danger logout-btn" @onclick="HandleLogout">Cerrar sesión</button>
 </nav>
+
+@code {
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: false);
+    }
+}

@@ -1,3 +1,31 @@
-﻿@* Este componente ha sido simplificado para eliminar referencias a la autorización *@
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
 
-<p>Login functionality is currently disabled.</p>
+<AuthorizeView>
+    <Authorized>
+        <span class="navbar-text me-3">
+            @context.User.Identity?.Name
+            @{
+                var role = context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            }
+            @if (!string.IsNullOrEmpty(role))
+            {
+                <span class="badge bg-secondary ms-1">@role</span>
+            }
+        </span>
+        <button class="btn btn-outline-danger btn-sm" @onclick="HandleLogout">
+            Cerrar sesión
+        </button>
+    </Authorized>
+    <NotAuthorized>
+        <a href="/login" class="btn btn-outline-primary btn-sm">Iniciar sesión</a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: false);
+    }
+}
