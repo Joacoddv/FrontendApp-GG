@@ -97,10 +97,12 @@ public sealed class BearerTokenHandler : DelegatingHandler
 }
 
 // CustomAuthenticationStateProvider.cs
+// NOTE: Implemented signature deviates from locked design (see W-01 in verify-report):
+// Actual: NotifyUserAuthentication(string token, DateTime expiresAtUtc) — improvement, not regression
 public class CustomAuthenticationStateProvider : AuthenticationStateProvider
 {
     public override Task<AuthenticationState> GetAuthenticationStateAsync();
-    public void NotifyUserAuthentication(string token); // decode -> notify
+    public void NotifyUserAuthentication(string token, DateTime expiresAtUtc); // actual impl
     public void NotifyUserLogout();
 }
 
@@ -193,10 +195,11 @@ No data migration. Isolated frontend feature branch; revert PR restores prior st
 ## NuGet Packages
 
 - **Add**: `Blazored.LocalStorage` (latest 4.x, net8.0 compatible).
+- **Add**: `Microsoft.Extensions.Http 8.0.0` (required explicitly — not in WASM SDK transitive closure after removing WebAssembly.Authentication).
 - **Keep**: `Microsoft.AspNetCore.Components.Authorization` (now actually wired).
 - **Remove wiring (package may stay)**: `Microsoft.AspNetCore.Components.WebAssembly.Authentication` — JS shim + `RemoteAuthenticatorView` removed; reference is harmless if left but should be dropped if nothing else uses it.
 
-## Open Questions
+## Open Questions (Resolved)
 
-- [ ] Confirm backend serializes JWT role claim key EXACTLY as the full `ClaimTypes.Role` URI (vs short `role`). If short, `JwtPayloadParser` must map the incoming key → URI. (Assumed full URI per PR #17.)
-- [ ] Post-login landing page: `/` (Home) assumed; confirm no role-specific dashboard required this slice.
+- Role claim key: backend uses short `"role"` key; `JwtPayloadParser` handles both short and full URI.
+- Post-login landing: `/` (Home).

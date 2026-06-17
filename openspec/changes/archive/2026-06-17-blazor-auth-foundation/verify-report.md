@@ -38,7 +38,7 @@ Both short `"role"` key and full URI key are handled. The trap (ADR-3) is correc
 - **Locked signature**: `NotifyUserAuthentication(string token)` (single param)
 - **Actual signature**: `NotifyUserAuthentication(string token, DateTime expiresAtUtc)` (two params)
 - **Impact**: The deviation is a behavioral improvement — without `expiresAtUtc` the `gg_token_expiry` storage key would never be written, making the fast-path expiry check (lines 35-39) unreachable. The code is correct. The design contract is stale.
-- **Action**: Update the design doc to match the implemented signature.
+- **Action**: Update the design doc to match the implemented signature. (Done in archived design.md.)
 
 ### W-02 — `ClienteService` and `IngredienteService` have hardcoded `localhost:5001` URLs
 
