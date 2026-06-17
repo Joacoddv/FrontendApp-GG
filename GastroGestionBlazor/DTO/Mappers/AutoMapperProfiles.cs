@@ -23,27 +23,17 @@ namespace DTO.Mappers
     {
         public AutoMapperProfiles()
         {
-            //Mapeo para Ingredientes
-            CreateMap<IngredienteBusquedaDTO, Ingrediente>();
-            CreateMap<IngredienteCreacionDTO, Ingrediente>();
-            CreateMap<IngredienteEdicionDTO, Ingrediente>();
+            // Ingrediente: keep only IngredienteToListDTO maps (still used by Plato_Ingrediente DTOs)
             CreateMap<IngredienteToListDTO, Ingrediente>();
             CreateMap<Ingrediente, IngredienteToListDTO>();
             CreateMap<Ingrediente[], IngredienteToListDTO[]>();
 
-            //Mapeo para Clientes
+            // Cliente: keep only ClienteBusquedaDTO and ClienteToListDTO maps
+            // (ClienteBusquedaDTO referenced by Direccion DTOs; ClienteToListDTO by Pedido + Direccion DTOs)
             CreateMap<ClienteBusquedaDTO, Dominio.Cliente>();
-            CreateMap<ClienteCreacionDTO, Dominio.Cliente>();
-            CreateMap<ClienteEdicionDTO, Dominio.Cliente>().ForMember(dest => dest.Fecha_Alta_Cliente, opt => opt.Ignore());
             CreateMap<ClienteToListDTO, Dominio.Cliente>();
             CreateMap<Dominio.Cliente, ClienteToListDTO>();
             CreateMap<Dominio.Cliente[], ClienteToListDTO[]>();
-            CreateMap<ClienteCreacionDTO, Dominio.Cliente>();
-            CreateMap<ClienteEdicionDTO, Dominio.Cliente>();
-            CreateMap<Dominio.Cliente, ClienteToListDTO>();
-            CreateMap<ClienteToListDTO, ClienteEdicionDTO>();
-            CreateMap<ClienteToListDTO, ClienteEdicionDTO>().ReverseMap();
-            CreateMap<ClienteToListDTO, ClienteCreacionDTO>().ReverseMap();
 
             //Mapeo para Direccion
             CreateMap<DireccionBusquedaDTO, Dominio.Direccion>().ForMember(dest => dest.Cliente, opt => opt.MapFrom(src => src.ClienteBusquedaDTO));
