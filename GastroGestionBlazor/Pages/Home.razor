@@ -1,11 +1,44 @@
-﻿@page "/"
+@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>GastroGestión</PageTitle>
 
-<h1>Hello, world!</h1>
+<section class="home-hero">
+    <span class="eyebrow">Sistema de gestión gastronómica</span>
+    <h1>El pase, <span class="accent">bajo control</span>.</h1>
+    <p class="lede">Clientes, pedidos, cocina y facturación — gestioná el restaurante de punta a punta, en tiempo real.</p>
+</section>
 
-<div class="alert alert-warning" role="alert">
-    Before authentication will function correctly, you must configure your provider details in <code>Program.cs</code>
+<div class="quick-grid">
+    <AuthorizeView Roles="Cocinero,Administrador">
+        <a class="quick-card is-kitchen" href="ordenes-trabajo">
+            <span class="qc-icon"><i class="fas fa-fire-burner"></i></span>
+            <h4>Cocina</h4>
+            <p>El tablero de comandas en vivo: pendientes, en preparación y listas.</p>
+        </a>
+    </AuthorizeView>
+    <a class="quick-card" href="clientes">
+        <span class="qc-icon"><i class="fas fa-users"></i></span>
+        <h4>Clientes</h4>
+        <p>Alta, búsqueda y edición de la cartera de clientes.</p>
+    </a>
+    <a class="quick-card" href="pedidos">
+        <span class="qc-icon"><i class="fas fa-receipt"></i></span>
+        <h4>Pedidos</h4>
+        <p>Tomá y seguí los pedidos de salón, take away y delivery.</p>
+    </a>
+    <a class="quick-card" href="ingredientes">
+        <span class="qc-icon"><i class="fas fa-carrot"></i></span>
+        <h4>Ingredientes</h4>
+        <p>El inventario de insumos y sus unidades de medida.</p>
+    </a>
+    <a class="quick-card" href="platos">
+        <span class="qc-icon"><i class="fas fa-utensils"></i></span>
+        <h4>Platos</h4>
+        <p>La carta: recetas, ingredientes y precios.</p>
+    </a>
+    <a class="quick-card" href="facturas">
+        <span class="qc-icon"><i class="fas fa-file-invoice-dollar"></i></span>
+        <h4>Facturas</h4>
+        <p>Emisión y consulta de comprobantes por pedido.</p>
+    </a>
 </div>
-
-Welcome to your new app.

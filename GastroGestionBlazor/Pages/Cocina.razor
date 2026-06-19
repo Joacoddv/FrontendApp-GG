@@ -12,22 +12,24 @@
 @inject ApiOptions ApiOptions
 @inject IAuthService AuthService
 
-<h3>Cocina — Tablero de órdenes de trabajo</h3>
-<hr class="custom-line" />
+<div class="page-head">
+    <span class="eyebrow">Servicio en vivo</span>
+    <h3>Cocina — el pase</h3>
+</div>
 
-@* Connection status badge *@
+@* Connection status *@
 <div class="mb-3">
     @if (_connState == HubConnectionState.Connected)
     {
-        <span class="badge bg-success">Conectado</span>
+        <span class="status-pill is-on"><span class="dot"></span>Conectado</span>
     }
     else if (_connState == HubConnectionState.Reconnecting)
     {
-        <span class="badge bg-warning text-dark">Reconectando&hellip;</span>
+        <span class="status-pill is-wait"><span class="dot"></span>Reconectando&hellip;</span>
     }
     else
     {
-        <span class="badge bg-danger">Desconectado</span>
+        <span class="status-pill is-off"><span class="dot"></span>Desconectado</span>
     }
 </div>
 
@@ -41,7 +43,7 @@
 
 @if (_isLoading)
 {
-    <p>Cargando tablero&hellip;</p>
+    <p class="text-muted">Cargando tablero&hellip;</p>
 }
 else if (ActiveItems.Count == 0)
 {
@@ -49,98 +51,113 @@ else if (ActiveItems.Count == 0)
 }
 else
 {
-    <div class="row">
-        @* Column: Pendientes (Creada) *@
-        <div class="col-md-4">
-            <h5 class="text-secondary">Pendientes</h5>
-            <hr />
+    <div class="board">
+        @* Pendientes (Creada) *@
+        <section class="board-col" data-state="pendiente">
+            <header class="col-head">
+                <span class="col-dot"></span>
+                <h2>Pendientes</h2>
+                <span class="col-count">@ActiveItems.Count(i => i.Estado == EstadoOT.Creada)</span>
+            </header>
             @foreach (var item in ActiveItems.Where(i => i.Estado == EstadoOT.Creada))
             {
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <p class="card-text mb-1">Pedido: @item.PedidoId.ToString()[..8]&hellip;</p>
-                        <p class="card-text mb-1">OT: @item.OtId.ToString()[..8]&hellip;</p>
-                        <p class="card-text mb-1">Tipo: @GetTipoPedidoLabel(item.PedidoTipo)</p>
+                <article class="ticket ticket--pendiente">
+                    <div class="ticket-top">
+                        <span class="ticket-no">#@item.OtId.ToString()[..8]</span>
+                        <span class="chip">@GetTipoPedidoLabel(item.PedidoTipo)</span>
+                    </div>
+                    <dl class="ticket-meta">
+                        <div><dt>Pedido</dt><dd>@item.PedidoId.ToString()[..8]</dd></div>
                         @if (item.CocineroAsignadoLegajoId.HasValue)
                         {
-                            <p class="card-text mb-1 text-muted small">Cocinero: @item.CocineroAsignadoLegajoId.Value.ToString()[..8]&hellip;</p>
+                            <div><dt>Cocinero</dt><dd>@item.CocineroAsignadoLegajoId.Value.ToString()[..8]</dd></div>
                         }
-                        <select class="form-select form-select-sm mt-2"
-                                value="@GetPickerValue(item.OtId)"
-                                @onchange="e => SetPickerValue(item.OtId, e)"
-                                disabled="@_assigning.Contains(item.OtId)">
-                            <option value="@Guid.Empty">— Seleccionar cocinero —</option>
-                            @foreach (var c in _cocineros)
-                            {
-                                <option value="@c.Id">@c.NombreCompleto</option>
-                            }
-                        </select>
-                        <button class="btn btn-primary btn-sm mt-1"
-                                @onclick="() => OnAsignarCocinero(item)"
-                                disabled="@IsAsignarDisabled(item)">
-                            @(_assigning.Contains(item.OtId) ? "Asignando..." : "Asignar")
-                        </button>
-                    </div>
-                </div>
+                    </dl>
+                    <select class="form-select form-select-sm"
+                            value="@GetPickerValue(item.OtId)"
+                            @onchange="e => SetPickerValue(item.OtId, e)"
+                            disabled="@_assigning.Contains(item.OtId)">
+                        <option value="@Guid.Empty">— Seleccionar cocinero —</option>
+                        @foreach (var c in _cocineros)
+                        {
+                            <option value="@c.Id">@c.NombreCompleto</option>
+                        }
+                    </select>
+                    <button class="btn btn-primary btn-sm"
+                            @onclick="() => OnAsignarCocinero(item)"
+                            disabled="@IsAsignarDisabled(item)">
+                        @(_assigning.Contains(item.OtId) ? "Asignando..." : "Asignar")
+                    </button>
+                </article>
             }
             @if (!ActiveItems.Any(i => i.Estado == EstadoOT.Creada))
             {
-                <p class="text-muted small">Sin órdenes pendientes.</p>
+                <p class="col-empty">Sin órdenes pendientes.</p>
             }
-        </div>
+        </section>
 
-        @* Column: En preparación (Preparandose) *@
-        <div class="col-md-4">
-            <h5 class="text-warning">En preparación</h5>
-            <hr />
+        @* En preparación (Preparandose) *@
+        <section class="board-col" data-state="preparacion">
+            <header class="col-head">
+                <span class="col-dot"></span>
+                <h2>En preparación</h2>
+                <span class="col-count">@ActiveItems.Count(i => i.Estado == EstadoOT.Preparandose)</span>
+            </header>
             @foreach (var item in ActiveItems.Where(i => i.Estado == EstadoOT.Preparandose))
             {
-                <div class="card mb-2 border-warning">
-                    <div class="card-body">
-                        <p class="card-text mb-1">Pedido: @item.PedidoId.ToString()[..8]&hellip;</p>
-                        <p class="card-text mb-1">OT: @item.OtId.ToString()[..8]&hellip;</p>
-                        <p class="card-text mb-1">Tipo: @GetTipoPedidoLabel(item.PedidoTipo)</p>
+                <article class="ticket ticket--preparacion">
+                    <div class="ticket-top">
+                        <span class="ticket-no">#@item.OtId.ToString()[..8]</span>
+                        <span class="chip">@GetTipoPedidoLabel(item.PedidoTipo)</span>
+                    </div>
+                    <dl class="ticket-meta">
+                        <div><dt>Pedido</dt><dd>@item.PedidoId.ToString()[..8]</dd></div>
                         @if (item.CocineroAsignadoLegajoId.HasValue)
                         {
-                            <p class="card-text mb-1 text-muted small">Cocinero: @item.CocineroAsignadoLegajoId.Value.ToString()[..8]&hellip;</p>
+                            <div><dt>Cocinero</dt><dd>@item.CocineroAsignadoLegajoId.Value.ToString()[..8]</dd></div>
                         }
-                        <button class="btn btn-success btn-sm mt-2"
-                                @onclick="() => OnMarcarLista(item)"
-                                disabled="@_marking.Contains(item.OtId)">
-                            @(_marking.Contains(item.OtId) ? "Marcando..." : "Marcar lista")
-                        </button>
-                    </div>
-                </div>
+                    </dl>
+                    <button class="btn btn-success btn-sm"
+                            @onclick="() => OnMarcarLista(item)"
+                            disabled="@_marking.Contains(item.OtId)">
+                        @(_marking.Contains(item.OtId) ? "Marcando..." : "Marcar lista")
+                    </button>
+                </article>
             }
             @if (!ActiveItems.Any(i => i.Estado == EstadoOT.Preparandose))
             {
-                <p class="text-muted small">Sin órdenes en preparación.</p>
+                <p class="col-empty">Sin órdenes en preparación.</p>
             }
-        </div>
+        </section>
 
-        @* Column: Listas (Lista) *@
-        <div class="col-md-4">
-            <h5 class="text-success">Listas</h5>
-            <hr />
+        @* Listas (Lista) *@
+        <section class="board-col" data-state="lista">
+            <header class="col-head">
+                <span class="col-dot"></span>
+                <h2>Listas</h2>
+                <span class="col-count">@ActiveItems.Count(i => i.Estado == EstadoOT.Lista)</span>
+            </header>
             @foreach (var item in ActiveItems.Where(i => i.Estado == EstadoOT.Lista))
             {
-                <div class="card mb-2 border-success">
-                    <div class="card-body">
-                        <p class="card-text mb-1">Pedido: @item.PedidoId.ToString()[..8]&hellip;</p>
-                        <p class="card-text mb-1">OT: @item.OtId.ToString()[..8]&hellip;</p>
-                        <p class="card-text mb-1">Tipo: @GetTipoPedidoLabel(item.PedidoTipo)</p>
+                <article class="ticket ticket--lista">
+                    <div class="ticket-top">
+                        <span class="ticket-no">#@item.OtId.ToString()[..8]</span>
+                        <span class="chip">@GetTipoPedidoLabel(item.PedidoTipo)</span>
+                    </div>
+                    <dl class="ticket-meta">
+                        <div><dt>Pedido</dt><dd>@item.PedidoId.ToString()[..8]</dd></div>
                         @if (item.CocineroAsignadoLegajoId.HasValue)
                         {
-                            <p class="card-text mb-1 text-muted small">Cocinero: @item.CocineroAsignadoLegajoId.Value.ToString()[..8]&hellip;</p>
+                            <div><dt>Cocinero</dt><dd>@item.CocineroAsignadoLegajoId.Value.ToString()[..8]</dd></div>
                         }
-                    </div>
-                </div>
+                    </dl>
+                </article>
             }
             @if (!ActiveItems.Any(i => i.Estado == EstadoOT.Lista))
             {
-                <p class="text-muted small">Sin órdenes listas.</p>
+                <p class="col-empty">Sin órdenes listas.</p>
             }
-        </div>
+        </section>
     </div>
 }
 
