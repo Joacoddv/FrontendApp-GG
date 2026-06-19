@@ -1,5 +1,6 @@
 using GastroGestionBlazor.Contracts.Common;
 using GastroGestionBlazor.Contracts.OrdenesTrabajo;
+using GastroGestionBlazor.Contracts.Usuarios;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -40,6 +41,32 @@ public sealed class KitchenBoardService
         if (!response.IsSuccessStatusCode)
         {
             await ThrowApiExceptionAsync(response, "No se pudo marcar la orden como lista.", ct);
+        }
+    }
+
+    public async Task<List<CocineroResponse>> GetCocinerosAsync(CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync("usuarios/cocineros", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, "No se pudo cargar la lista de cocineros.", ct);
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<List<CocineroResponse>>(JsonOptions, ct);
+        return result ?? new List<CocineroResponse>();
+    }
+
+    public async Task AsignarCocineroAsync(Guid pedidoId, Guid otId, Guid cocineroLegajoId, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"pedidos/{pedidoId}/ordenes-trabajo/{otId}/asignar-cocinero",
+            new { cocineroLegajoId },
+            JsonOptions,
+            ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, "No se pudo asignar el cocinero.", ct);
         }
     }
 
