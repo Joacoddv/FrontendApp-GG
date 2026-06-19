@@ -3,36 +3,39 @@
 
 <nav class="sidebar">
     <div class="sidebar-header">
-        <img src="images/GastroGestionpeque-removebg-preview-Blanco.png" alt="Logo" class="logo" />
+        <img src="images/GastroGestionpeque-removebg-preview-Blanco.png" alt="GastroGestión" class="logo" />
+        <div>
+            <span class="brand-word">Gastro<span>Gestión</span></span>
+            <span class="brand-sub">El pase</span>
+        </div>
     </div>
     <ul class="nav flex-column">
         <li class="nav-item">
-            <NavLink class="nav-link" href="clientes">Clientes</NavLink>
+            <NavLink class="nav-link" href="clientes"><i class="fas fa-users"></i>Clientes</NavLink>
         </li>
         <li class="nav-item">
-            <NavLink class="nav-link" href="pedidos">Pedidos</NavLink>
+            <NavLink class="nav-link" href="pedidos"><i class="fas fa-receipt"></i>Pedidos</NavLink>
         </li>
         <li class="nav-item">
-            <NavLink class="nav-link" href="facturas">Facturas</NavLink>
+            <NavLink class="nav-link" href="facturas"><i class="fas fa-file-invoice-dollar"></i>Facturas</NavLink>
         </li>
         <li class="nav-item">
-            <NavLink class="nav-link" href="platos">Platos</NavLink>
+            <NavLink class="nav-link" href="platos"><i class="fas fa-utensils"></i>Platos</NavLink>
         </li>
         <li class="nav-item">
-            <NavLink class="nav-link" href="ingredientes">Ingredientes</NavLink>
+            <NavLink class="nav-link" href="ingredientes"><i class="fas fa-carrot"></i>Ingredientes</NavLink>
         </li>
         <li class="nav-item">
-            <NavLink class="nav-link" href="menu">Menu</NavLink>
+            <NavLink class="nav-link" href="menu"><i class="fas fa-book-open"></i>Menú</NavLink>
         </li>
-        @* Kitchen board — gated to Cocinero and Administrador roles. BAF-08.
-           The actual board page is implemented in Slice C; this entry is nav-only. *@
+        @* Kitchen board — gated to Cocinero and Administrador roles. BAF-08. *@
         <AuthorizeView Roles="Cocinero,Administrador">
             <li class="nav-item">
-                <NavLink class="nav-link" href="ordenes-trabajo">Cocina</NavLink>
+                <NavLink class="nav-link" href="ordenes-trabajo"><i class="fas fa-fire-burner"></i>Cocina</NavLink>
             </li>
         </AuthorizeView>
     </ul>
-    <button class="btn btn-danger logout-btn" @onclick="HandleLogout">Cerrar sesión</button>
+    <button class="btn logout-btn" @onclick="HandleLogout"><i class="fas fa-right-from-bracket"></i>Cerrar sesión</button>
 </nav>
 
 @code {
