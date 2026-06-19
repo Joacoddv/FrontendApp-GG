@@ -28,6 +28,41 @@ public class PlatoService
         return result ?? new List<PlatoResponse>();
     }
 
+    public async Task<Guid> CreateAsync(CrearPlatoRequest request)
+    {
+        var response = await _httpClient.PostAsJsonAsync("platos", request, JsonOptions);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            ProblemDetailsResponse? problem = null;
+            try
+            {
+                problem = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(JsonOptions);
+            }
+            catch { /* ignore deserialization errors */ }
+
+            throw new ApiException(problem?.Detail ?? problem?.Title ?? "Error al crear el plato.");
+        }
+
+        // POST returns the new Guid in the body; fall back to the Location header.
+        try
+        {
+            var id = await response.Content.ReadFromJsonAsync<Guid>(JsonOptions);
+            if (id != Guid.Empty)
+                return id;
+        }
+        catch { /* body may not be a bare Guid */ }
+
+        if (response.Headers.Location is { } location)
+        {
+            var segments = location.AbsolutePath.Split('/');
+            if (Guid.TryParse(segments[^1], out var locationId))
+                return locationId;
+        }
+
+        return Guid.Empty;
+    }
+
     private static async Task ThrowApiExceptionAsync(
         HttpResponseMessage response, string fallback, CancellationToken ct)
     {
