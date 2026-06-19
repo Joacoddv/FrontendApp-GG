@@ -1,73 +1,163 @@
-/* General styles */
+/* ============================================================
+   GastroGestion — Design tokens
+   Professional SaaS base (slate + teal) with a warm amber accent.
+   ============================================================ */
+:root {
+    /* Surfaces */
+    --gg-bg: #f7f8fa;
+    --gg-surface: #ffffff;
+    --gg-surface-alt: #f1f3f5;
+
+    /* Sidebar */
+    --gg-sidebar: #1f2933;
+    --gg-sidebar-hover: #2d3a47;
+    --gg-sidebar-text: #cbd2d9;
+
+    /* Text */
+    --gg-text: #1f2933;
+    --gg-text-muted: #6b7280;
+    --gg-heading: #111827;
+
+    /* Brand */
+    --gg-primary: #0f766e;
+    --gg-primary-hover: #0c5d56;
+    --gg-primary-soft: #e6f2f0;
+    --gg-accent: #f59e0b;
+    --gg-accent-hover: #d97706;
+
+    /* Feedback */
+    --gg-danger: #dc2626;
+    --gg-danger-hover: #b91c1c;
+
+    /* Lines & elevation */
+    --gg-border: #e5e7eb;
+    --gg-radius: 8px;
+    --gg-radius-lg: 12px;
+    --gg-shadow-sm: 0 1px 2px rgba(16, 24, 40, .05);
+    --gg-shadow: 0 1px 3px rgba(16, 24, 40, .08), 0 1px 2px rgba(16, 24, 40, .04);
+    --gg-shadow-md: 0 4px 12px rgba(16, 24, 40, .08);
+
+    /* Layout */
+    --gg-sidebar-width: 240px;
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     margin: 0;
     padding: 0;
+    background-color: var(--gg-bg);
+    color: var(--gg-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5 {
+    color: var(--gg-heading);
+    font-weight: 600;
 }
 
 h3 {
     margin-top: 20px;
+    margin-bottom: 16px;
+    font-size: 1.35rem;
+}
+
+a {
+    color: var(--gg-primary);
+}
+
+a:hover {
+    color: var(--gg-primary-hover);
 }
 
 .custom-line {
-    border: 1px solid #000;
+    border: none;
+    border-top: 1px solid var(--gg-border);
+    margin: 16px 0;
 }
 
-/* Sidebar styles */
+/* ============================================================
+   Sidebar
+   ============================================================ */
 .sidebar {
     height: 100vh;
-    width: 220px;
+    width: var(--gg-sidebar-width);
     position: fixed;
     top: 0;
     left: 0;
-    background-color: #343a40;
-    color: white;
+    background-color: var(--gg-sidebar);
+    color: var(--gg-sidebar-text);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding-top: 20px;
+    padding-top: 8px;
+    box-shadow: var(--gg-shadow-md);
 }
 
 .sidebar-header {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 10px;
+    padding: 20px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
+    margin-bottom: 8px;
 }
 
 .logo {
-    width: 200px;
+    width: 180px;
     height: auto;
 }
 
 .nav {
     flex-grow: 1;
+    padding: 0 12px;
 }
 
     .nav .nav-link {
-        color: white;
-        padding: 10px 20px;
+        color: var(--gg-sidebar-text);
+        padding: 11px 16px;
+        border-radius: var(--gg-radius);
         text-decoration: none;
+        font-size: .925rem;
+        font-weight: 500;
+        transition: background-color .15s ease, color .15s ease;
     }
 
         .nav .nav-link:hover {
-            background-color: #495057;
-            color: white;
+            background-color: var(--gg-sidebar-hover);
+            color: #ffffff;
         }
 
-/* Main content styles */
+/* ============================================================
+   App shell
+   ============================================================ */
 .app-container {
     display: flex;
-    height: 100vh;
+    min-height: 100vh;
 }
 
 .main-content {
-    margin-left: 220px;
-    padding: 20px;
+    margin-left: var(--gg-sidebar-width);
+    padding: 28px 32px;
     flex-grow: 1;
+    max-width: 100%;
 }
 
-/* Search and filter styles */
+/* ============================================================
+   Cards (Bootstrap override — soft, elevated)
+   ============================================================ */
+.card {
+    border: 1px solid var(--gg-border);
+    border-radius: var(--gg-radius-lg);
+    box-shadow: var(--gg-shadow-sm);
+}
+
+/* ============================================================
+   Search & filters
+   ============================================================ */
 .form-row {
     display: flex;
     align-items: center;
@@ -77,8 +167,8 @@ h3 {
 .search-container {
     display: flex;
     align-items: flex-end;
-    gap: 10px;
-    margin-bottom: 15px;
+    gap: 12px;
+    margin-bottom: 18px;
 }
 
     .search-container .form-group {
@@ -86,36 +176,135 @@ h3 {
     }
 
     .search-container .form-control {
-        width: 200px;
+        width: 220px;
     }
 
-.table th, .table td {
-    text-align: left;
-    vertical-align: middle;
+/* ============================================================
+   Forms
+   ============================================================ */
+.form-control,
+.form-select {
+    border: 1px solid var(--gg-border);
+    border-radius: var(--gg-radius);
 }
 
-.table th {
-    text-transform: capitalize;
+    .form-control:focus,
+    .form-select:focus {
+        border-color: var(--gg-primary);
+        box-shadow: 0 0 0 3px var(--gg-primary-soft);
+    }
+
+label {
+    font-weight: 500;
+    color: var(--gg-text);
+    margin-bottom: 4px;
 }
 
-/* Detail container styles */
+/* ============================================================
+   Tables
+   ============================================================ */
+.table {
+    background-color: var(--gg-surface);
+    border-radius: var(--gg-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--gg-shadow-sm);
+}
+
+    .table th,
+    .table td {
+        padding: 12px 14px;
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .table th {
+        text-transform: capitalize;
+        background-color: var(--gg-surface-alt);
+        color: var(--gg-text-muted);
+        font-weight: 600;
+        font-size: .8rem;
+        letter-spacing: .02em;
+        border-bottom: 1px solid var(--gg-border);
+    }
+
+    .table tbody tr {
+        border-bottom: 1px solid var(--gg-border);
+    }
+
+        .table tbody tr:hover {
+            background-color: var(--gg-surface-alt);
+        }
+
+/* ============================================================
+   Detail panel
+   ============================================================ */
 .detail-container {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
+    background-color: var(--gg-surface);
+    padding: 24px;
+    border-radius: var(--gg-radius-lg);
+    border: 1px solid var(--gg-border);
+    box-shadow: var(--gg-shadow-sm);
     margin-top: 20px;
-    margin-bottom: 60px; /* Ensure there is margin-bottom */
+    margin-bottom: 60px;
 }
 
 .detail-item {
     flex: 1 1 30%;
 }
 
-    .detail-item input {
-        width: 100%;
+    .detail-item label {
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: block;
+        color: var(--gg-text-muted);
+        font-size: .85rem;
     }
 
-/* Form actions styles */
+    .detail-item input {
+        width: 100%;
+        border: 1px solid var(--gg-border);
+        border-radius: var(--gg-radius);
+        padding: 10px 12px;
+        margin-bottom: 10px;
+        background-color: var(--gg-surface-alt);
+    }
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn {
+    border-radius: var(--gg-radius);
+    font-weight: 500;
+}
+
+.btn-primary {
+    background-color: var(--gg-primary);
+    border-color: var(--gg-primary);
+    color: #fff;
+}
+
+    .btn-primary:hover,
+    .btn-primary:focus,
+    .btn-primary:active {
+        background-color: var(--gg-primary-hover) !important;
+        border-color: var(--gg-primary-hover) !important;
+        color: #fff;
+    }
+
+.btn-outline-primary {
+    color: var(--gg-primary);
+    border-color: var(--gg-primary);
+}
+
+    .btn-outline-primary:hover {
+        background-color: var(--gg-primary);
+        border-color: var(--gg-primary);
+    }
+
+/* Form action row */
 .form-actions {
     flex-basis: 100%;
     display: flex;
@@ -124,24 +313,12 @@ h3 {
     margin-top: 20px;
 }
 
-    .form-actions .btn-primary {
-        background-color: #007bff;
-        border-color: #007bff;
-        color: #fff;
-    }
-
-    .form-actions .btn-secondary {
-        background-color: #6c757d;
-        border-color: #6c757d;
-        color: #fff;
-    }
-
-/* Action buttons styles */
+/* Icon action buttons in tables */
 .action-buttons {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
     .action-buttons .btn-info,
@@ -150,65 +327,96 @@ h3 {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 5px;
+        padding: 6px;
         background-color: transparent;
         border: none;
-        color: #007bff;
+        color: var(--gg-text-muted);
+        transition: color .15s ease, background-color .15s ease;
+        border-radius: var(--gg-radius);
     }
 
     .action-buttons .btn i {
-        font-size: 18px;
-        color: #007bff;
+        font-size: 17px;
     }
 
-    .action-buttons .btn:hover {
-        color: #0056b3;
+    .action-buttons .btn-info:hover {
+        color: var(--gg-primary);
+        background-color: var(--gg-primary-soft);
     }
 
-/* Logout button styles */
+    .action-buttons .btn-warning:hover {
+        color: var(--gg-accent-hover);
+        background-color: #fef3e2;
+    }
+
+    .action-buttons .btn-danger:hover {
+        color: var(--gg-danger);
+        background-color: #fde8e8;
+    }
+
+/* Logout */
 .logout-btn {
-    margin: 20px;
-    background-color: #dc3545;
-    border-color: #dc3545;
-    color: #fff;
-    padding: 8px 16px; /* Smaller size */
+    margin: 16px 12px 20px;
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, .18);
+    color: var(--gg-sidebar-text);
+    padding: 9px 16px;
+    border-radius: var(--gg-radius);
     text-align: center;
-    font-size: 14px; /* Adjusted font size */
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease;
 }
 
     .logout-btn:hover {
-        background-color: #c82333;
-        border-color: #bd2130;
+        background-color: var(--gg-danger);
+        border-color: var(--gg-danger);
+        color: #fff;
     }
 
-/* Custom adjustments */
-.table th, .table td {
-    padding: 10px;
-    text-align: center; /* Center align text in table cells */
+/* ============================================================
+   Login screen
+   ============================================================ */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: linear-gradient(135deg, #1f2933 0%, #0f766e 100%);
 }
 
-.detail-container {
-    background-color: #f9f9f9;
-    padding: 20px;
-    border-radius: 5px;
-    border: 1px solid #ddd;
-    margin-top: 20px;
-    margin-bottom: 60px; /* Ensure margin-bottom */
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    background-color: var(--gg-surface);
+    border-radius: var(--gg-radius-lg);
+    box-shadow: var(--gg-shadow-md);
+    padding: 36px 32px;
 }
 
-.detail-item label {
-    font-weight: bold;
-    margin-bottom: 5px;
+.login-header {
+    text-align: center;
+    margin-bottom: 28px;
 }
 
-.detail-item input {
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 10px;
-    margin-bottom: 10px;
+    .login-header h2 {
+        margin: 16px 0 0;
+        font-size: 1.4rem;
+        color: var(--gg-heading);
+    }
+
+.login-logo {
+    width: 160px;
+    height: auto;
+    background-color: var(--gg-sidebar);
+    border-radius: var(--gg-radius);
+    padding: 12px 16px;
 }
 
-/* Ensure footer spacing */
+/* ============================================================
+   Misc
+   ============================================================ */
 .footer-spacing {
-    height: 40px; /* Footer spacing */
+    height: 40px;
 }
