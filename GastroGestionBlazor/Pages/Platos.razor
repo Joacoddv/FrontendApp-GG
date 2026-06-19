@@ -40,7 +40,7 @@ else
                     <td>@p.Nombre</td>
                     <td>@p.PrecioBase.ToString("N2") @p.Moneda</td>
                     <td>@p.AlicuotaIVA</td>
-                    <td>@p.Receta.Length</td>
+                    <td>@(p.Receta?.Length ?? 0)</td>
                     <td>
                         @if (p.Activo)
                         {

@@ -38,7 +38,7 @@ else
                 <tr class="@(m.Activo ? "" : "text-muted")">
                     <td>@m.Nombre</td>
                     <td>@m.FechaVigencia.ToString("dd/MM/yyyy")</td>
-                    <td>@m.Items.Length</td>
+                    <td>@(m.Items?.Length ?? 0)</td>
                     <td>
                         @if (m.Activo)
                         {
