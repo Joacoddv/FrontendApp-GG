@@ -280,6 +280,9 @@ label {
     font-weight: 500;
 }
 
+/* Bootstrap 5.1.0 hardcodes the primary colors (no --bs-btn-* vars),
+   and uses .btn-primary:disabled at (0,2,0) specificity — so the
+   disabled state must be overridden explicitly or it stays BS blue. */
 .btn-primary {
     background-color: var(--gg-primary);
     border-color: var(--gg-primary);
@@ -288,9 +291,22 @@ label {
 
     .btn-primary:hover,
     .btn-primary:focus,
-    .btn-primary:active {
-        background-color: var(--gg-primary-hover) !important;
-        border-color: var(--gg-primary-hover) !important;
+    .btn-primary:active,
+    .btn-primary.active {
+        background-color: var(--gg-primary-hover);
+        border-color: var(--gg-primary-hover);
+        color: #fff;
+    }
+
+    .btn-primary:focus,
+    .btn-primary:focus-visible {
+        box-shadow: 0 0 0 .25rem var(--gg-primary-soft);
+    }
+
+    .btn-primary:disabled,
+    .btn-primary.disabled {
+        background-color: var(--gg-primary);
+        border-color: var(--gg-primary);
         color: #fff;
     }
 
@@ -299,9 +315,11 @@ label {
     border-color: var(--gg-primary);
 }
 
-    .btn-outline-primary:hover {
+    .btn-outline-primary:hover,
+    .btn-outline-primary:active {
         background-color: var(--gg-primary);
         border-color: var(--gg-primary);
+        color: #fff;
     }
 
 /* Form action row */
