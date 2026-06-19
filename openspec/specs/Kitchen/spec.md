@@ -3,7 +3,7 @@
 **Capability**: kitchen-board-realtime
 **First delivered by**: blazor-slice-c (Phase 7, Slice C — PR #3, merge commit 6d93967)
 **Status**: Active
-**Last updated**: 2026-06-17
+**Last updated**: 2026-06-18 (asignar-cocinero-ui merged via PR #4, merge commit d63057f)
 
 ---
 
@@ -93,6 +93,10 @@ public sealed record OrdenTrabajoBoardItem(
     Guid       LineaPedidoId,
     EstadoOT   Estado,
     Guid?      CocineroAsignadoLegajoId);
+
+// Contracts/Usuarios/CocineroResponse.cs (NEW — asignar-cocinero-ui)
+namespace GastroGestionBlazor.Contracts.Usuarios;
+public sealed record CocineroResponse(Guid Id, string NombreCompleto);
 ```
 
 Reuses `Contracts.Common.ProblemDetailsResponse` and `ApiException` from Slice B.
@@ -307,13 +311,154 @@ and `Contracts/Enums/` (enums), reusing the Slice B namespace layout.
 
 ---
 
+### Requirement: BC-08 — Cocinero List Loading
+
+On board initialization the system MUST call `GET /usuarios/cocineros` via the authenticated HTTP
+client and cache the result in a page-scoped list. The list MUST be loaded once (not per card). If
+the list is empty the assign action MUST be disabled for all Creada cards. The system MUST NOT
+re-fetch the cocinero list on every `OtChanged` event.
+
+#### Scenario: Cocineros loaded on init — success
+
+- GIVEN the user opens `/ordenes-trabajo`
+- WHEN `OnInitializedAsync` completes
+- THEN `GET /usuarios/cocineros` has been called exactly once
+- AND the resulting `List<CocineroResponse>` is available for all Creada card pickers
+
+#### Scenario: Cocineros list is empty
+
+- GIVEN `GET /usuarios/cocineros` returns `200 []`
+- WHEN the board renders Creada OTs
+- THEN the picker has no options and the "Asignar" button is disabled for every Creada card
+
+#### Scenario: Cocineros load fails (network / 403)
+
+- GIVEN `GET /usuarios/cocineros` throws or returns a non-200 status
+- WHEN the exception is caught
+- THEN the cocinero list remains empty, the assign action is disabled
+- AND the existing `_errorMessage` mechanism surfaces a Spanish error message
+
+---
+
+### Requirement: BC-09 — Cook Picker on Creada Cards
+
+Each OT card with `Estado == Creada` MUST render a `<select>` element populated with the loaded
+cocinero list (display: `NombreCompleto`; value: `Id`). The picker MUST be bound per-OT via a
+`Dictionary<Guid, Guid> _pickerSelection` keyed by `OtId`. Cards in `Preparandose` or `Lista` MUST
+NOT render the picker or the "Asignar" button. No inline role check is required inside the card —
+the page-level `[Authorize]` gate is sufficient.
+
+#### Scenario: Picker renders only on Creada cards
+
+- GIVEN the board contains OTs in Creada, Preparandose, and Lista states
+- WHEN the page renders
+- THEN the `<select>` + "Asignar" button appear exclusively on Creada cards
+- AND Preparandose / Lista cards are unaffected
+
+#### Scenario: Each card has independent picker state
+
+- GIVEN two OTs in Creada state are visible
+- WHEN the user selects different cocineros in each card's picker
+- THEN both selections are retained independently and do not interfere with each other
+
+---
+
+### Requirement: BC-10 — Asignar Cocinero Submission
+
+Clicking the "Asignar" button MUST POST to
+`/pedidos/{pedidoId}/ordenes-trabajo/{otId}/asignar-cocinero` with body
+`{ "cocineroLegajoId": "<selectedGuid>" }`. The transition to `Preparandose` is **echo-driven**:
+the client MUST NOT mutate local state on success; the server broadcasts `OtChanged` and the
+existing BC-04 handler moves the card. The button MUST be disabled during the in-flight request
+(controlled via `HashSet<Guid> _assigning`). On the `OtChanged` echo the system MUST remove the OT
+from `_assigning` (mirrors the `_marking` pattern from BC-05).
+
+#### Scenario: Asignar — success (echo-driven card move)
+
+- GIVEN a Creada OT card with a cocinero selected in the picker
+- WHEN the user clicks "Asignar"
+- THEN the button is disabled immediately (OtId added to `_assigning`)
+- AND a POST is sent with the selected `cocineroLegajoId`
+- AND on `OtChanged` echo the card moves to "En preparación" and `_assigning` is cleared
+
+#### Scenario: Asignar — button stays disabled until echo
+
+- GIVEN the POST returns 200
+- WHEN the response is received but before `OtChanged` arrives
+- THEN the button remains disabled
+- AND local board state is NOT mutated by the client
+
+#### Scenario: Asignar — 422 concurrent race
+
+- GIVEN another user assigned the same OT first
+- WHEN the POST returns 422
+- THEN the Spanish `ProblemDetails.Detail` message is shown via `_errorMessage`
+- AND the OtId is removed from `_assigning` (button re-enabled)
+- AND local board state is NOT changed by the client
+
+#### Scenario: Asignar — 404 pedido not found
+
+- GIVEN the pedido was deleted after the board loaded
+- WHEN the POST returns 404
+- THEN a Spanish error message is shown
+- AND the OtId is removed from `_assigning` (button re-enabled)
+
+#### Scenario: Asignar — network error
+
+- GIVEN the POST fails with a network/timeout exception
+- WHEN the exception is caught
+- THEN a generic Spanish error message is shown
+- AND the OtId is removed from `_assigning` (button re-enabled)
+- AND local board state is NOT changed
+
+---
+
+### Requirement: BC-11 — Submit Guard (Empty / No-Selection)
+
+The "Asignar" button MUST be disabled when no cocinero is selected in the picker for that OT
+(i.e., the bound value is `Guid.Empty` or the picker has no options). The system MUST NOT
+submit a `POST` with an empty `cocineroLegajoId` (avoids backend 400 from FluentValidation).
+
+#### Scenario: Button disabled with no cocinero selected
+
+- GIVEN a Creada card is rendered with a populated cocinero picker
+- WHEN no cocinero has been selected (default / Guid.Empty)
+- THEN the "Asignar" button is disabled
+- AND no POST is attempted on click
+
+#### Scenario: Button enabled when cocinero is selected
+
+- GIVEN a Creada card with at least one cocinero in the picker
+- WHEN the user selects a cocinero from the dropdown
+- THEN the "Asignar" button becomes enabled (provided the OT is not in-flight)
+
+---
+
+### Requirement: BC-12 — CocineroResponse Client Contract
+
+The frontend MUST define a `CocineroResponse` sealed record in `Contracts/Usuarios/` matching the
+backend contract exactly: `(Guid Id, string NombreCompleto)`. `Id` is used as `cocineroLegajoId`
+in the POST body; `NombreCompleto` is the display label in the picker. No additional fields are
+permitted that could cause deserialization drift.
+
+#### Scenario: Contract round-trip
+
+- GIVEN the backend returns `[{ "id": "<guid>", "nombreCompleto": "Jane Doe" }]`
+- WHEN deserialized into `List<CocineroResponse>`
+- THEN `Id` and `NombreCompleto` are populated without errors
+- AND the `Id` value is used verbatim as `cocineroLegajoId` in the assignment POST
+
+---
+
 ## Service and Page Architecture
 
 ### KitchenBoardService (DI-scoped)
 
 - Ctor: `(HttpClient httpClient)` — receives default `AuthorizedApi` (Slice A factory).
 - `GetBoardAsync(CancellationToken ct)` → `GET ordenes-trabajo` (relative), returns `List<OrdenTrabajoBoardItem>`.
+- `GetCocinerosAsync(CancellationToken ct)` → `GET usuarios/cocineros`, returns `List<CocineroResponse>` (NEW — BC-08, asignar-cocinero-ui).
 - `MarcarListaAsync(Guid pedidoId, Guid otId, CancellationToken ct)` → `POST pedidos/{pedidoId}/ordenes-trabajo/{otId}/marcar-lista` with `null` content; on failure deserializes `ProblemDetailsResponse`, throws `ApiException(Detail ?? Title ?? Spanish-fallback)`.
+- `AsignarCocineroAsync(Guid pedidoId, Guid otId, Guid cocineroLegajoId, CancellationToken ct)` → `POST pedidos/{pedidoId}/ordenes-trabajo/{otId}/asignar-cocinero` with JSON body `{ cocineroLegajoId }`; on failure throws `ApiException` (NEW — BC-10, asignar-cocinero-ui).
 - Static `JsonOptions = new(JsonSerializerDefaults.Web){ Converters = { new JsonStringEnumConverter() } }`.
 
 ### KitchenRealtimeConnection (page-owned, `IAsyncDisposable`)
@@ -348,25 +493,30 @@ and `Contracts/Enums/` (enums), reusing the Slice B namespace layout.
 | ADR-8 | Load-all + group client-side (no `?estado=` filter) | Simpler than per-column fetches; `OtChanged` upsert naturally re-buckets rows across columns. |
 | ADR-9 | `Cancelada` hidden | Not rendered as a column; incoming `OtChanged` with `Estado == Cancelada` removes the row. |
 | ADR-10 | Connection page-owned (not DI) | HubConnection has page lifetime; must `DisposeAsync` on navigate-away. `KitchenBoardService` (HTTP-only) is DI-scoped. |
+| ADR-11 | Asignar cocinero: two new methods on KitchenBoardService (not separate UsuarioService) | Single kitchen-scoped endpoint; cohesive with board operations. Rejected: standalone service (premature). |
+| ADR-12 | Cocinero list loaded once on init (not per card, not live-refresh) | Acceptable MVP trade-off. Live refresh deferred. Rejected: per-card fetch (redundant), reconnect-only refresh (miss new cooks during session). |
+| ADR-13 | Echo-driven Asignar (not optimistic mutation) | Identical to marcar-lista pattern; button disabled until OtChanged moves card. Rejected: optimistic move (desync risk on 422). |
+| ADR-14 | Dictionary\<Guid,Guid\> _pickerSelection per OT (not child component) | Fewest files; isolates picker state without EventCallback. Rejected: child OtCard component (no current benefit, adds complexity). |
 
 ---
 
 ## Known Deferred Items / Carried Follow-ups
 
-| Item | Detail | Target |
+| Item | Detail | Status |
 |------|--------|--------|
-| Asignar cocinero | No cook-list endpoint exists to populate a cocinero picker; feature deferred. | Slice C2 or future backend task |
+| Asignar cocinero | Cook-list endpoint now available (GET /usuarios/cocineros); feature delivered in asignar-cocinero-ui change (PR #4, merge commit d63057f). | DELIVERED |
+| CancellationToken hardening | Service methods GetCocinerosAsync, AsignarCocineroAsync, and existing MarcarListaAsync accept CancellationToken but page does not wire a component-scoped source (e.g. linked to DisposeAsync). Future hardening slice should add CancellationTokenSource to Cocina.razor and wire it through all service calls. | Deferred to future slice |
 | `Counter.razor` orphan | `Pages/Counter.razor` at `/counter` duplicates Clientes.razor; not in nav; recommend delete. | Follow-up PR (noted in Slice B deferred) |
 | AutoMapper NU1903 | Pre-existing vulnerability warning on AutoMapper package; does not originate from this change. | Separate dependency-update task |
 | WARNING-02: ReHydrateAsync thread safety | `_items =` assignment in `ReHydrateAsync` is outside `InvokeAsync`; WASM-safe today (single-threaded JS), architecturally imperfect. Fixed in commit 0fe2c57. | Already addressed |
 
 ---
 
-## Non-Goals (Out of Scope for this Capability)
+## Non-Goals (Out of Scope for Kitchen Capability)
 
-- Asignar cocinero action (no cook-list endpoint; deferred to future slice).
 - OT generation (mozo/Pedido flow — different role/workflow).
 - Automated tests (no test project in repo; acceptance is manual smoke test).
 - Any backend change.
 - Refresh tokens (no refresh flow — Slice A ADR-5).
 - Friendly display labels beyond the three-column Spanish mapping.
+- Live refresh of the cocinero list after initial load (deferred to future hardening slice).
