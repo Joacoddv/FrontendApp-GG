@@ -1,6 +1,10 @@
 @page "/platos"
 @using GastroGestionBlazor.Contracts.Platos
+@using GastroGestionBlazor.Contracts.Ingredientes
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Common
 @inject PlatoService PlatoService
+@inject IngredienteService IngredienteService
 
 <PageTitle>Platos · GastroGestión</PageTitle>
 
@@ -8,6 +12,8 @@
     <span class="eyebrow">La carta</span>
     <h3>Platos</h3>
 </div>
+
+<button class="btn btn-primary mb-3" @onclick="AbrirCreacion"><i class="fas fa-plus"></i> Nuevo plato</button>
 
 @if (_isLoading)
 {
@@ -57,10 +63,87 @@ else
     </table>
 }
 
+@if (_showCreateForm)
+{
+    <h3>Nuevo plato</h3>
+    @if (!string.IsNullOrEmpty(_createError))
+    {
+        <p class="text-danger">@_createError</p>
+    }
+    <div class="detail-container">
+        <div class="detail-item">
+            <label>Nombre <span class="text-danger">*</span></label>
+            <input @bind="_nuevoPlato.Nombre" class="form-control" />
+        </div>
+        <div class="detail-item">
+            <label>Precio base (ARS) <span class="text-danger">*</span></label>
+            <input type="number" step="0.01" min="0" @bind="_nuevoPlato.PrecioBase" class="form-control" />
+        </div>
+        <div class="detail-item">
+            <label>Alícuota IVA</label>
+            <select @bind="_nuevoPlato.AlicuotaIVA" class="form-select">
+                @foreach (var v in Enum.GetValues<AlicuotaIVA>())
+                {
+                    <option value="@v">@v</option>
+                }
+            </select>
+        </div>
+
+        <div style="flex-basis:100%">
+            <label>Receta</label>
+            @if (_nuevoPlato.Lineas.Count == 0)
+            {
+                <p class="text-muted small mb-2">Sin ingredientes. Podés guardar el plato igual y completar la receta más adelante.</p>
+            }
+            @foreach (var linea in _nuevoPlato.Lineas)
+            {
+                <div class="d-flex gap-2 mb-2 align-items-end">
+                    <div style="flex:1 1 auto">
+                        <select @bind="linea.IngredienteId" class="form-select">
+                            <option value="@Guid.Empty">— Ingrediente —</option>
+                            @foreach (var ing in _ingredientes)
+                            {
+                                <option value="@ing.Id">@ing.Nombre</option>
+                            }
+                        </select>
+                    </div>
+                    <div style="width:120px">
+                        <input type="number" step="0.01" min="0" @bind="linea.Cantidad" class="form-control" placeholder="Cantidad" />
+                    </div>
+                    <div style="width:150px">
+                        <select @bind="linea.Unidad" class="form-select">
+                            @foreach (var u in Enum.GetValues<UnidadDeMedida>())
+                            {
+                                <option value="@u">@u</option>
+                            }
+                        </select>
+                    </div>
+                    <button class="btn btn-danger" @onclick="() => QuitarLinea(linea)" title="Quitar"><i class="fas fa-trash"></i></button>
+                </div>
+            }
+            <button class="btn btn-secondary btn-sm" @onclick="AgregarLinea"><i class="fas fa-plus"></i> Agregar ingrediente</button>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" @onclick="GuardarPlato" disabled="@_isSaving">
+                @(_isSaving ? "Guardando..." : "Guardar")
+            </button>
+            <button class="btn btn-secondary ms-2" @onclick="CancelarCreacion">Cancelar</button>
+        </div>
+    </div>
+    <div class="footer-spacing"></div>
+}
+
 @code {
     private List<PlatoResponse> _platos = new();
+    private List<IngredienteResponse> _ingredientes = new();
     private bool _isLoading = true;
     private string? _error;
+
+    private bool _showCreateForm;
+    private bool _isSaving;
+    private string? _createError;
+    private NuevoPlatoModel _nuevoPlato = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -76,5 +159,99 @@ else
         {
             _isLoading = false;
         }
+    }
+
+    private async Task AbrirCreacion()
+    {
+        _nuevoPlato = new();
+        _createError = null;
+        _showCreateForm = true;
+
+        // Lazy-load the ingredient catalogue for the recipe picker (only when needed).
+        if (_ingredientes.Count == 0)
+        {
+            try
+            {
+                _ingredientes = await IngredienteService.GetAllAsync();
+            }
+            catch (Exception ex)
+            {
+                _createError = $"No se pudieron cargar los ingredientes: {ex.Message}";
+            }
+        }
+    }
+
+    private void AgregarLinea() => _nuevoPlato.Lineas.Add(new RecetaLineaModel());
+
+    private void QuitarLinea(RecetaLineaModel linea) => _nuevoPlato.Lineas.Remove(linea);
+
+    private async Task GuardarPlato()
+    {
+        if (string.IsNullOrWhiteSpace(_nuevoPlato.Nombre))
+        {
+            _createError = "El nombre es obligatorio.";
+            return;
+        }
+        if (_nuevoPlato.PrecioBase <= 0)
+        {
+            _createError = "El precio base debe ser mayor a cero.";
+            return;
+        }
+        if (_nuevoPlato.Lineas.Any(l => l.IngredienteId == Guid.Empty))
+        {
+            _createError = "Seleccioná un ingrediente en cada línea de la receta o quitá las líneas vacías.";
+            return;
+        }
+
+        _isSaving = true;
+        _createError = null;
+
+        try
+        {
+            var request = new CrearPlatoRequest(
+                _nuevoPlato.Nombre,
+                _nuevoPlato.PrecioBase,
+                _nuevoPlato.AlicuotaIVA,
+                _nuevoPlato.Lineas
+                    .Select(l => new RecetaLineaRequest(l.IngredienteId, l.Cantidad, l.Unidad))
+                    .ToArray());
+
+            await PlatoService.CreateAsync(request);
+            _showCreateForm = false;
+            _platos = await PlatoService.GetAllAsync();
+        }
+        catch (ApiException ex)
+        {
+            _createError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _createError = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void CancelarCreacion()
+    {
+        _showCreateForm = false;
+        _createError = null;
+    }
+
+    private class NuevoPlatoModel
+    {
+        public string Nombre { get; set; } = string.Empty;
+        public decimal PrecioBase { get; set; }
+        public AlicuotaIVA AlicuotaIVA { get; set; } = AlicuotaIVA.General;
+        public List<RecetaLineaModel> Lineas { get; set; } = new();
+    }
+
+    private class RecetaLineaModel
+    {
+        public Guid IngredienteId { get; set; } = Guid.Empty;
+        public decimal Cantidad { get; set; }
+        public UnidadDeMedida Unidad { get; set; } = UnidadDeMedida.Unidad;
     }
 }
