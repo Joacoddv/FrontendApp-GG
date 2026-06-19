@@ -5,6 +5,30 @@
    accent, herb green for go/ready. The kitchen board reads as
    real comandas on a rail. Display: Bricolage Grotesque.
    ============================================================ */
+
+/* Self-hosted variable fonts (no external CDN — works offline) */
+@font-face {
+    font-family: 'Bricolage Grotesque';
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url('fonts/bricolage.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('fonts/inter.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url('fonts/jetbrains-mono.woff2') format('woff2');
+}
+
 :root {
     /* Surfaces — porcelain working line */
     --ground: #efeeea;
@@ -154,9 +178,13 @@ a:hover { color: var(--copper-bright); }
 }
 
 .logo {
-    width: 40px;
-    height: auto;
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
     flex-shrink: 0;
+    background: var(--copper);
+    border-radius: 11px;
+    padding: 7px;
 }
 
 .brand-word {
@@ -806,6 +834,43 @@ label, .form-group label {
    Misc
    ============================================================ */
 .footer-spacing { height: 40px; }
+
+/* ============================================================
+   Placeholder screen (routes without a backend list yet)
+   ============================================================ */
+.placeholder-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 52vh;
+    padding: 40px 20px;
+}
+
+    .placeholder-screen .ph-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        background: var(--copper-soft);
+        color: var(--copper);
+        margin-bottom: 22px;
+    }
+
+    .placeholder-screen h3 {
+        font-size: 1.6rem;
+        margin: 0 0 10px;
+    }
+
+    .placeholder-screen p {
+        color: var(--ink-soft);
+        max-width: 42ch;
+        margin: 0;
+    }
 
 @media (max-width: 900px) {
     .board { grid-template-columns: 1fr; }

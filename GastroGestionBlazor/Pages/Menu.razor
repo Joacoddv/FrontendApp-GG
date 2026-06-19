@@ -1,0 +1,78 @@
+@page "/menu"
+@using GastroGestionBlazor.Contracts.Menus
+@inject MenuService MenuService
+
+<PageTitle>Menús · GastroGestión</PageTitle>
+
+<div class="page-head">
+    <span class="eyebrow">La oferta</span>
+    <h3>Menús</h3>
+</div>
+
+@if (_isLoading)
+{
+    <p class="text-muted">Cargando menús&hellip;</p>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+else if (_menus.Count == 0)
+{
+    <p class="text-muted">No hay menús cargados.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Vigencia</th>
+                <th>Platos</th>
+                <th>Activo</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var m in _menus)
+            {
+                <tr class="@(m.Activo ? "" : "text-muted")">
+                    <td>@m.Nombre</td>
+                    <td>@m.FechaVigencia.ToString("dd/MM/yyyy")</td>
+                    <td>@(m.Items?.Length ?? 0)</td>
+                    <td>
+                        @if (m.Activo)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactivo</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<MenuResponse> _menus = new();
+    private bool _isLoading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _menus = await MenuService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

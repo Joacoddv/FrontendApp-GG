@@ -1,0 +1,80 @@
+@page "/platos"
+@using GastroGestionBlazor.Contracts.Platos
+@inject PlatoService PlatoService
+
+<PageTitle>Platos · GastroGestión</PageTitle>
+
+<div class="page-head">
+    <span class="eyebrow">La carta</span>
+    <h3>Platos</h3>
+</div>
+
+@if (_isLoading)
+{
+    <p class="text-muted">Cargando platos&hellip;</p>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+else if (_platos.Count == 0)
+{
+    <p class="text-muted">No hay platos cargados.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Precio base</th>
+                <th>IVA</th>
+                <th>Ingredientes</th>
+                <th>Activo</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in _platos)
+            {
+                <tr class="@(p.Activo ? "" : "text-muted")">
+                    <td>@p.Nombre</td>
+                    <td>@p.PrecioBase.ToString("N2") @p.Moneda</td>
+                    <td>@p.AlicuotaIVA</td>
+                    <td>@(p.Receta?.Length ?? 0)</td>
+                    <td>
+                        @if (p.Activo)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactivo</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<PlatoResponse> _platos = new();
+    private bool _isLoading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _platos = await PlatoService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
