@@ -3,7 +3,9 @@
 @using GastroGestionBlazor.Contracts.Clientes
 @using GastroGestionBlazor.Contracts.Enums
 @using GastroGestionBlazor.Contracts.Common
+@using Microsoft.AspNetCore.Authorization
 @inject ClienteService ClienteService
+@inject IJSRuntime JS
 
 <h3>Clientes</h3>
 <hr class="custom-line" />
@@ -15,18 +17,16 @@
 <div class="search-container">
     <div class="form-group">
         <label for="campoBusqueda">Filtrar por:</label>
-        <select id="campoBusqueda" class="form-control" disabled title="No disponible aún">
+        <select id="campoBusqueda" class="form-control">
             <option>Nombre</option>
         </select>
-        <small class="text-muted">No disponible aún</small>
     </div>
     <div class="form-group">
         <label for="valorBusqueda">Valor:</label>
-        <input id="valorBusqueda" class="form-control" disabled title="No disponible aún" />
+        <input id="valorBusqueda" class="form-control" @bind="searchNombre" placeholder="Buscar por nombre..." />
     </div>
     <div class="form-group">
-        <button class="btn btn-secondary" disabled title="No disponible aún">Buscar</button>
-        <small class="text-muted ms-1">No disponible aún</small>
+        <button class="btn btn-secondary" @onclick="BuscarClientes">Buscar</button>
     </div>
 </div>
 
@@ -76,9 +76,10 @@ else
                     </td>
                     <td class="action-buttons">
                         <button class="btn btn-info btn-sm" @onclick="() => VerDetalle(cliente)" title="Ver Detalle"><i class="fas fa-eye"></i></button>
-                        <button class="btn btn-secondary btn-sm" disabled title="No disponible aún"><i class="fas fa-edit"></i></button>
-                        <small class="text-muted">No disponible aún</small>
-                        <button class="btn btn-secondary btn-sm" disabled title="No disponible aún"><i class="fas fa-trash"></i></button>
+                        <AuthorizeView Roles="Administrador">
+                            <button class="btn btn-warning btn-sm" @onclick="() => MostrarEditar(cliente)" title="Editar"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-danger btn-sm" @onclick="() => EliminarCliente(cliente.Id)" title="Eliminar"><i class="fas fa-trash"></i></button>
+                        </AuthorizeView>
                     </td>
                 </tr>
             }
@@ -111,6 +112,45 @@ else
             </div>
             <div class="mt-3">
                 <button class="btn btn-secondary" @onclick="CerrarDetalle">Cerrar</button>
+            </div>
+        </div>
+        <div class="footer-spacing"></div>
+    }
+
+    @if (showEditForm && clienteEnEdicion != null)
+    {
+        <h3>Editar cliente</h3>
+        @if (!string.IsNullOrEmpty(editErrorMessage))
+        {
+            <p class="text-danger">@editErrorMessage</p>
+        }
+        <div class="detail-container">
+            <div class="detail-item">
+                <label>Nombre: <span class="text-danger">*</span></label>
+                <input @bind="editModel.Nombre" class="form-control" />
+            </div>
+            <div class="detail-item">
+                <label>Condición IVA: <span class="text-danger">*</span></label>
+                <select @bind="editModel.CondicionIVA" class="form-control">
+                    @foreach (var valor in Enum.GetValues<CondicionIVA>())
+                    {
+                        <option value="@valor">@valor</option>
+                    }
+                </select>
+            </div>
+            <div class="detail-item">
+                <label>CUIT:</label>
+                <input @bind="editModel.Cuit" class="form-control" />
+            </div>
+            <div class="detail-item">
+                <label>Email:</label>
+                <input @bind="editModel.Email" class="form-control" />
+            </div>
+            <div class="mt-3">
+                <button class="btn btn-primary" @onclick="GuardarEdicionCliente" disabled="@isSaving">
+                    @(isSaving ? "Guardando..." : "Guardar")
+                </button>
+                <button class="btn btn-secondary ms-2" @onclick="CerrarEdicion">Cancelar</button>
             </div>
         </div>
         <div class="footer-spacing"></div>
@@ -159,25 +199,30 @@ else
 @code {
     private List<ClienteResponse> clientes = new();
     private ClienteResponse? clienteSeleccionado;
+    private ClienteResponse? clienteEnEdicion;
     private NuevoClienteModel nuevoCliente = new();
+    private EditarClienteModel editModel = new();
     private bool isLoading = true;
     private bool showCreateForm = false;
+    private bool showEditForm = false;
     private bool isSaving = false;
+    private string? searchNombre;
     private string? errorMessage;
     private string? createErrorMessage;
+    private string? editErrorMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        await CargarClientes();
+        await BuscarClientes();
     }
 
-    private async Task CargarClientes()
+    private async Task BuscarClientes()
     {
         try
         {
             isLoading = true;
             errorMessage = null;
-            clientes = await ClienteService.GetAllAsync();
+            clientes = await ClienteService.SearchAsync(searchNombre, false);
         }
         catch (Exception ex)
         {
@@ -193,11 +238,38 @@ else
     {
         clienteSeleccionado = cliente;
         showCreateForm = false;
+        showEditForm = false;
+        clienteEnEdicion = null;
+        editErrorMessage = null;
     }
 
     private void CerrarDetalle()
     {
         clienteSeleccionado = null;
+    }
+
+    private void MostrarEditar(ClienteResponse cliente)
+    {
+        clienteEnEdicion = cliente;
+        editModel = new EditarClienteModel
+        {
+            Nombre = cliente.Nombre,
+            CondicionIVA = cliente.CondicionIVA,
+            Cuit = cliente.Cuit,
+            Email = cliente.Email
+        };
+        editErrorMessage = null;
+        showEditForm = true;
+        clienteSeleccionado = null;
+        showCreateForm = false;
+    }
+
+    private void CerrarEdicion()
+    {
+        showEditForm = false;
+        clienteEnEdicion = null;
+        editModel = new EditarClienteModel();
+        editErrorMessage = null;
     }
 
     private void AgregarNuevoCliente()
@@ -206,6 +278,68 @@ else
         createErrorMessage = null;
         showCreateForm = true;
         clienteSeleccionado = null;
+        showEditForm = false;
+        clienteEnEdicion = null;
+        editErrorMessage = null;
+    }
+
+    private async Task GuardarEdicionCliente()
+    {
+        if (clienteEnEdicion == null) return;
+
+        if (string.IsNullOrWhiteSpace(editModel.Nombre))
+        {
+            editErrorMessage = "El nombre es requerido.";
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+            editErrorMessage = null;
+            var req = new EditarClienteRequest(
+                editModel.Nombre,
+                editModel.CondicionIVA,
+                string.IsNullOrWhiteSpace(editModel.Cuit) ? null : editModel.Cuit,
+                string.IsNullOrWhiteSpace(editModel.Email) ? null : editModel.Email);
+
+            await ClienteService.UpdateAsync(clienteEnEdicion.Id, req);
+            CerrarEdicion();
+            await BuscarClientes();
+        }
+        catch (ApiException ex)
+        {
+            editErrorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            editErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task EliminarCliente(Guid id)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", "¿Eliminar este cliente?");
+        if (!ok) return;
+
+        try
+        {
+            errorMessage = null;
+            await ClienteService.DeleteAsync(id);
+            await BuscarClientes();
+        }
+        catch (ApiException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
     }
 
     private async Task GuardarCliente()
@@ -228,7 +362,7 @@ else
 
             await ClienteService.CreateAsync(request);
             showCreateForm = false;
-            await CargarClientes();
+            await BuscarClientes();
         }
         catch (ApiException ex)
         {
@@ -252,6 +386,15 @@ else
 
     // Mutable view-model for the create form (records are immutable)
     private class NuevoClienteModel
+    {
+        public string Nombre { get; set; } = string.Empty;
+        public CondicionIVA CondicionIVA { get; set; } = CondicionIVA.ConsumidorFinal;
+        public string? Cuit { get; set; }
+        public string? Email { get; set; }
+    }
+
+    // Mutable view-model for the edit form
+    private class EditarClienteModel
     {
         public string Nombre { get; set; } = string.Empty;
         public CondicionIVA CondicionIVA { get; set; } = CondicionIVA.ConsumidorFinal;
