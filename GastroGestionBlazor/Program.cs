@@ -5,8 +5,6 @@ using GastroGestionBlazor.Services.Auth;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using AutoMapper;
-using DTO.Mappers;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -53,6 +51,5 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddScoped<ClienteService>();
 builder.Services.AddScoped<IngredienteService>();
 builder.Services.AddScoped<KitchenBoardService>();
-builder.Services.AddAutoMapper(typeof(AutoMapperProfiles));
 
 await builder.Build().RunAsync();
