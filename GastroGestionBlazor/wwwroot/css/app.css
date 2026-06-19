@@ -406,6 +406,7 @@ a:hover { color: var(--copper-bright); }
 .btn-danger {
     background-color: var(--danger);
     border-color: var(--danger);
+    color: #fff;
 }
 
 /* ============================================================
