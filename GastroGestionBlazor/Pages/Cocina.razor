@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using GastroGestionBlazor.Contracts.Enums
 @using GastroGestionBlazor.Contracts.Common
+@using GastroGestionBlazor.Contracts.Usuarios
 @using GastroGestionBlazor.Options
 
 @inject KitchenBoardService BoardService
@@ -64,6 +65,21 @@ else
                         {
                             <p class="card-text mb-1 text-muted small">Cocinero: @item.CocineroAsignadoLegajoId.Value.ToString()[..8]&hellip;</p>
                         }
+                        <select class="form-select form-select-sm mt-2"
+                                value="@GetPickerValue(item.OtId)"
+                                @onchange="e => SetPickerValue(item.OtId, e)"
+                                disabled="@_assigning.Contains(item.OtId)">
+                            <option value="@Guid.Empty">— Seleccionar cocinero —</option>
+                            @foreach (var c in _cocineros)
+                            {
+                                <option value="@c.Id">@c.NombreCompleto</option>
+                            }
+                        </select>
+                        <button class="btn btn-primary btn-sm mt-1"
+                                @onclick="() => OnAsignarCocinero(item)"
+                                disabled="@IsAsignarDisabled(item)">
+                            @(_assigning.Contains(item.OtId) ? "Asignando..." : "Asignar")
+                        </button>
                     </div>
                 </div>
             }
@@ -133,6 +149,9 @@ else
     private bool _isLoading = true;
     private string? _errorMessage;
     private HashSet<Guid> _marking = new();
+    private HashSet<Guid> _assigning = new();
+    private List<CocineroResponse> _cocineros = new();
+    private Dictionary<Guid, Guid> _pickerSelection = new();
     private KitchenRealtimeConnection? _conn;
     private HubConnectionState _connState = HubConnectionState.Disconnected;
 
@@ -146,6 +165,16 @@ else
         try
         {
             _items = await BoardService.GetBoardAsync();
+
+            // Load cocineros once; failure must not block board display — only disables assign action.
+            try
+            {
+                _cocineros = await BoardService.GetCocinerosAsync();
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = ex.Message;
+            }
 
             _conn = new KitchenRealtimeConnection(ApiOptions, AuthService);
             await _conn.StartAsync(OnOtChanged, ReHydrateAsync, OnConnStateChanged);
@@ -184,8 +213,9 @@ else
                 _items.Add(item);
             }
 
-            // Echo arrived — unblock the Marcar lista button for this OT.
+            // Echo arrived — unblock the Marcar lista and Asignar buttons for this OT.
             _marking.Remove(item.OtId);
+            _assigning.Remove(item.OtId);
 
             StateHasChanged();
         });
@@ -243,6 +273,50 @@ else
         {
             _errorMessage = ex.Message;
             _marking.Remove(item.OtId);
+        }
+    }
+
+    // Safe picker getter — returns Guid.Empty when OtId has no entry yet (avoids KeyNotFoundException on @bind).
+    private Guid GetPickerValue(Guid otId) =>
+        _pickerSelection.TryGetValue(otId, out var val) ? val : Guid.Empty;
+
+    private void SetPickerValue(Guid otId, ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var parsed))
+            _pickerSelection[otId] = parsed;
+    }
+
+    private bool IsAsignarDisabled(OrdenTrabajoBoardItem item) =>
+        _assigning.Contains(item.OtId) ||
+        _cocineros.Count == 0 ||
+        !_pickerSelection.TryGetValue(item.OtId, out var sel) ||
+        sel == Guid.Empty;
+
+    private async Task OnAsignarCocinero(OrdenTrabajoBoardItem item)
+    {
+        if (_assigning.Contains(item.OtId))
+            return;
+
+        if (!_pickerSelection.TryGetValue(item.OtId, out var cocineroId) || cocineroId == Guid.Empty)
+            return;
+
+        _assigning.Add(item.OtId);
+        _errorMessage = null;
+
+        try
+        {
+            await BoardService.AsignarCocineroAsync(item.PedidoId, item.OtId, cocineroId);
+            // Echo-driven: button stays disabled until OtChanged echo arrives and removes from _assigning.
+        }
+        catch (ApiException ex)
+        {
+            _errorMessage = ex.Message;
+            _assigning.Remove(item.OtId);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _assigning.Remove(item.OtId);
         }
     }
 
