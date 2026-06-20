@@ -53,5 +53,6 @@ builder.Services.AddScoped<IngredienteService>();
 builder.Services.AddScoped<KitchenBoardService>();
 builder.Services.AddScoped<PlatoService>();
 builder.Services.AddScoped<MenuService>();
+builder.Services.AddScoped<PedidoService>();
 
 await builder.Build().RunAsync();
