@@ -4,7 +4,9 @@
 @using GastroGestionBlazor.Contracts.Enums
 @using GastroGestionBlazor.Contracts.Stock
 @using GastroGestionBlazor.Contracts.Common
+@using GastroGestionBlazor.Contracts.Proveedores
 @inject StockService StockService
+@inject ProveedorService ProveedorService
 
 <PageTitle>Stock · GastroGestión</PageTitle>
 
@@ -52,6 +54,19 @@
         <label>Cantidad</label>
         <input type="number" min="0" step="0.01" class="form-control" @bind="_movCantidad" placeholder="Cantidad" />
     </div>
+    @if (_movTipo == TipoMovimientoStock.Compra)
+    {
+        <div class="form-group">
+            <label>Proveedor</label>
+            <select class="form-control" @bind="_movProveedorId">
+                <option value="@Guid.Empty">— Sin proveedor —</option>
+                @foreach (var p in _proveedores)
+                {
+                    <option value="@p.Id">@p.Nombre</option>
+                }
+            </select>
+        </div>
+    }
     <div class="form-group">
         <button class="btn btn-primary" disabled="@_saving" @onclick="Registrar">
             @(_saving ? "Registrando..." : "Registrar movimiento")
@@ -139,6 +154,7 @@ else
                             <th>Fecha</th>
                             <th>Movimiento</th>
                             <th class="text-end">Cantidad</th>
+                            <th>Proveedor</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -148,6 +164,7 @@ else
                                 <td>@m.FechaMovimiento.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
                                 <td><span class="badge @TipoBadge(m.Tipo)">@TipoLabel(m.Tipo)</span></td>
                                 <td class="text-end @(m.Cantidad < 0 ? "text-danger" : "text-success")">@m.Cantidad.ToString("N2")</td>
+                                <td>@ProveedorNombre(m.ProveedorId)</td>
                             </tr>
                         }
                     </tbody>
@@ -168,6 +185,10 @@ else
     private Guid _movIngredienteId = Guid.Empty;
     private TipoMovimientoStock _movTipo = TipoMovimientoStock.Compra;
     private decimal _movCantidad;
+    private Guid _movProveedorId = Guid.Empty;
+
+    private List<ProveedorResponse> _proveedores = new();
+    private Dictionary<Guid, string> _provById = new();
 
     private IngredienteBalanceResponse? _histIngrediente;
     private List<MovimientoStockResponse> _movimientos = new();
@@ -177,7 +198,20 @@ else
 
     private List<IngredienteBalanceResponse> EnAlerta => _balances.Where(b => b.EnAlerta).ToList();
 
-    protected override async Task OnInitializedAsync() => await CargarBalances();
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _proveedores = await ProveedorService.GetAllAsync();
+            _provById = _proveedores.ToDictionary(p => p.Id, p => p.Nombre);
+        }
+        catch { /* proveedores are optional context for the Compra picker/history */ }
+
+        await CargarBalances();
+    }
+
+    private string ProveedorNombre(Guid? id)
+        => id is { } pid && _provById.TryGetValue(pid, out var n) ? n : "—";
 
     private async Task CargarBalances()
     {
@@ -282,9 +316,15 @@ else
         _saving = true;
         try
         {
-            await StockService.RegistrarMovimientoAsync(_movIngredienteId, _movTipo, _movCantidad);
+            // Proveedor only applies to a purchase.
+            Guid? proveedorId = _movTipo == TipoMovimientoStock.Compra && _movProveedorId != Guid.Empty
+                ? _movProveedorId
+                : null;
+
+            await StockService.RegistrarMovimientoAsync(_movIngredienteId, _movTipo, _movCantidad, proveedorId);
             _ok = $"Movimiento registrado: {_movTipo} de {_movCantidad:N2}.";
             _movCantidad = 0;
+            _movProveedorId = Guid.Empty;
             await CargarBalances();
 
             // Keep an open history panel in sync if it shows the affected ingredient.

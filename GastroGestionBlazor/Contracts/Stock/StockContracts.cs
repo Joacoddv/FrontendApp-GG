@@ -21,7 +21,8 @@ public sealed record RegistrarMovimientoStockRequest(
     TipoMovimientoStock Tipo,
     decimal Cantidad,
     Guid? OrdenTrabajoId,
-    Guid? LineaPedidoId);
+    Guid? LineaPedidoId,
+    Guid? ProveedorId);
 
 /// <summary>A single stock-ledger entry (GET /stock/movimientos/{ingredienteId}).</summary>
 public sealed record MovimientoStockResponse(
@@ -29,4 +30,5 @@ public sealed record MovimientoStockResponse(
     Guid IngredienteId,
     TipoMovimientoStock Tipo,
     decimal Cantidad,
-    DateTime FechaMovimiento);
+    DateTime FechaMovimiento,
+    Guid? ProveedorId);
