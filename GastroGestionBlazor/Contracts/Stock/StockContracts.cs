@@ -8,7 +8,12 @@ public sealed record IngredienteBalanceResponse(
     string Nombre,
     UnidadDeMedida Unidad,
     bool Activo,
-    decimal Balance);
+    decimal Balance,
+    decimal StockMinimo,
+    bool EnAlerta);
+
+/// <summary>Body for PUT /ingredientes/{id}/stock-minimo — sets the reorder threshold.</summary>
+public sealed record ActualizarStockMinimoRequest(decimal StockMinimo);
 
 /// <summary>Body for POST /stock/movimientos (manual types: Compra, Ajuste, Merma).</summary>
 public sealed record RegistrarMovimientoStockRequest(

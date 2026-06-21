@@ -20,6 +20,15 @@
     <div class="alert alert-success" role="alert">@_ok</div>
 }
 
+@if (EnAlerta.Count > 0)
+{
+    <div class="alert alert-warning" role="alert">
+        <i class="fas fa-triangle-exclamation"></i>
+        <strong>@EnAlerta.Count</strong> ingrediente@(EnAlerta.Count == 1 ? "" : "s") en alerta de stock:
+        @string.Join(", ", EnAlerta.Select(b => b.Nombre))
+    </div>
+}
+
 <div class="search-container">
     <div class="form-group">
         <label>Ingrediente</label>
@@ -66,6 +75,7 @@ else
                 <th>Ingrediente</th>
                 <th>Unidad</th>
                 <th class="text-end">Balance</th>
+                <th class="text-end">Umbral</th>
                 <th>Estado</th>
                 <th></th>
             </tr>
@@ -76,15 +86,22 @@ else
                 <tr class="@(b.Activo ? "" : "text-muted")">
                     <td>@b.Nombre</td>
                     <td>@b.Unidad</td>
-                    <td class="text-end @(b.Balance < 0 ? "text-danger fw-bold" : "")">@b.Balance.ToString("N2")</td>
+                    <td class="text-end @(b.Balance <= b.StockMinimo ? "text-danger fw-bold" : "")">@b.Balance.ToString("N2")</td>
+                    <td class="text-end">
+                        <div class="d-flex gap-1 justify-content-end align-items-center">
+                            <input type="number" min="0" step="0.01" class="form-control form-control-sm text-end" style="width:90px"
+                                   @bind="_umbralEdits[b.IngredienteId]" />
+                            <button class="btn btn-secondary btn-sm" title="Guardar umbral" @onclick="() => GuardarUmbral(b.IngredienteId)"><i class="fas fa-check"></i></button>
+                        </div>
+                    </td>
                     <td>
                         @if (b.Balance <= 0)
                         {
                             <span class="badge bg-danger">Sin stock</span>
                         }
-                        else if (b.Balance < 100)
+                        else if (b.EnAlerta)
                         {
-                            <span class="badge bg-warning text-dark">Bajo</span>
+                            <span class="badge bg-warning text-dark">En alerta</span>
                         }
                         else
                         {
@@ -156,6 +173,10 @@ else
     private List<MovimientoStockResponse> _movimientos = new();
     private bool _histLoading;
 
+    private readonly Dictionary<Guid, decimal> _umbralEdits = new();
+
+    private List<IngredienteBalanceResponse> EnAlerta => _balances.Where(b => b.EnAlerta).ToList();
+
     protected override async Task OnInitializedAsync() => await CargarBalances();
 
     private async Task CargarBalances()
@@ -165,6 +186,8 @@ else
         try
         {
             _balances = await StockService.GetBalancesAsync();
+            foreach (var b in _balances)
+                _umbralEdits[b.IngredienteId] = b.StockMinimo;
         }
         catch (Exception ex)
         {
@@ -196,6 +219,27 @@ else
     }
 
     private void CerrarMovimientos() => _histIngrediente = null;
+
+    private async Task GuardarUmbral(Guid ingredienteId)
+    {
+        _error = null;
+        _ok = null;
+        try
+        {
+            var valor = _umbralEdits.TryGetValue(ingredienteId, out var v) ? v : 0m;
+            await StockService.SetStockMinimoAsync(ingredienteId, valor);
+            _ok = "Umbral de stock actualizado.";
+            await CargarBalances();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
 
     private static string TipoLabel(TipoMovimientoStock t) => t switch
     {

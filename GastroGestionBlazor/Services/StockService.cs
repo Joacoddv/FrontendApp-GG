@@ -42,6 +42,16 @@ public sealed class StockService
         return result ?? new List<MovimientoStockResponse>();
     }
 
+    /// <summary>PUT /ingredientes/{id}/stock-minimo — set the reorder (low-stock alert) threshold.</summary>
+    public async Task SetStockMinimoAsync(Guid ingredienteId, decimal stockMinimo, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PutAsJsonAsync(
+            $"ingredientes/{ingredienteId}/stock-minimo",
+            new ActualizarStockMinimoRequest(stockMinimo), JsonOptions, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo actualizar el umbral de stock.", ct);
+    }
+
     /// <summary>POST /stock/movimientos — register a manual movement (Compra / Merma / Ajuste).</summary>
     public async Task RegistrarMovimientoAsync(
         Guid ingredienteId, TipoMovimientoStock tipo, decimal cantidad, CancellationToken ct = default)
