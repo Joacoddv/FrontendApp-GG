@@ -58,3 +58,6 @@ $RECYCLE.BIN/
 
 # Uncomment if you have tasks that create the publish folder
 # publish/
+
+# Gentle AI agent tooling (skill registry, caches) — local state, not project source.
+.atl/
