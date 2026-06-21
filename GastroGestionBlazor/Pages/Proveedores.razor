@@ -1,0 +1,223 @@
+@page "/proveedores"
+@attribute [Authorize(Roles = "Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Proveedores
+@using GastroGestionBlazor.Contracts.Common
+@inject ProveedorService ProveedorService
+@inject IJSRuntime JS
+
+<PageTitle>Proveedores · GastroGestión</PageTitle>
+
+<h3>Proveedores</h3>
+<hr class="custom-line" />
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+@if (!string.IsNullOrEmpty(_ok))
+{
+    <div class="alert alert-success" role="alert">@_ok</div>
+}
+
+<div class="search-container">
+    <div class="form-group">
+        <label>@(_editId is null ? "Nuevo proveedor" : "Editar proveedor")</label>
+        <input class="form-control" @bind="_form.Nombre" placeholder="Nombre *" />
+    </div>
+    <div class="form-group">
+        <label>CUIT</label>
+        <input class="form-control" @bind="_form.Cuit" placeholder="CUIT (opcional)" />
+    </div>
+    <div class="form-group">
+        <label>Email</label>
+        <input class="form-control" @bind="_form.Email" placeholder="Email (opcional)" />
+    </div>
+    <div class="form-group">
+        <label>Teléfono</label>
+        <input class="form-control" @bind="_form.Telefono" placeholder="Teléfono (opcional)" />
+    </div>
+    <div class="form-group">
+        <button class="btn btn-primary" disabled="@_saving" @onclick="Guardar">
+            @(_saving ? "Guardando..." : _editId is null ? "Crear" : "Guardar cambios")
+        </button>
+        @if (_editId is not null)
+        {
+            <button class="btn btn-secondary ms-1" @onclick="CancelarEdicion">Cancelar</button>
+        }
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <p>Cargando&hellip;</p>
+}
+else if (_proveedores.Count == 0)
+{
+    <p class="text-muted">No hay proveedores.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>CUIT</th>
+                <th>Email</th>
+                <th>Teléfono</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in _proveedores)
+            {
+                <tr>
+                    <td>@p.Nombre</td>
+                    <td>@(string.IsNullOrEmpty(p.Cuit) ? "—" : p.Cuit)</td>
+                    <td>@(string.IsNullOrEmpty(p.Email) ? "—" : p.Email)</td>
+                    <td>@(string.IsNullOrEmpty(p.Telefono) ? "—" : p.Telefono)</td>
+                    <td class="action-buttons">
+                        <button class="btn btn-warning btn-sm" title="Editar" @onclick="() => Editar(p)"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-danger btn-sm" title="Eliminar" @onclick="() => Eliminar(p)"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _saving;
+    private string? _error;
+    private string? _ok;
+
+    private List<ProveedorResponse> _proveedores = new();
+
+    private Guid? _editId;
+    private readonly FormModel _form = new();
+
+    protected override async Task OnInitializedAsync() => await Cargar();
+
+    private async Task Cargar()
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            _proveedores = await ProveedorService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Editar(ProveedorResponse p)
+    {
+        _editId = p.Id;
+        _form.Nombre = p.Nombre;
+        _form.Cuit = p.Cuit;
+        _form.Email = p.Email;
+        _form.Telefono = p.Telefono;
+        _ok = null;
+        _error = null;
+    }
+
+    private void CancelarEdicion()
+    {
+        _editId = null;
+        _form.Reset();
+    }
+
+    private async Task Guardar()
+    {
+        _error = null;
+        _ok = null;
+        if (string.IsNullOrWhiteSpace(_form.Nombre))
+        {
+            _error = "El nombre es obligatorio.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var nombre = _form.Nombre.Trim();
+            var cuit = Nullify(_form.Cuit);
+            var email = Nullify(_form.Email);
+            var tel = Nullify(_form.Telefono);
+
+            if (_editId is { } id)
+            {
+                await ProveedorService.UpdateAsync(id, new EditarProveedorRequest(nombre, cuit, email, tel));
+                _ok = "Proveedor actualizado.";
+            }
+            else
+            {
+                await ProveedorService.CreateAsync(new CrearProveedorRequest(nombre, cuit, email, tel));
+                _ok = "Proveedor creado.";
+            }
+
+            _editId = null;
+            _form.Reset();
+            await Cargar();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task Eliminar(ProveedorResponse p)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", $"¿Eliminar el proveedor '{p.Nombre}'?");
+        if (!ok)
+            return;
+
+        _error = null;
+        _ok = null;
+        try
+        {
+            await ProveedorService.DeleteAsync(p.Id);
+            _ok = "Proveedor eliminado.";
+            if (_editId == p.Id) CancelarEdicion();
+            await Cargar();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private static string? Nullify(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private sealed class FormModel
+    {
+        public string? Nombre { get; set; }
+        public string? Cuit { get; set; }
+        public string? Email { get; set; }
+        public string? Telefono { get; set; }
+
+        public void Reset()
+        {
+            Nombre = Cuit = Email = Telefono = null;
+        }
+    }
+}
