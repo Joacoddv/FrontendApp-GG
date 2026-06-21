@@ -276,6 +276,27 @@ a:hover { color: var(--copper-bright); }
         color: #fff;
     }
 
+/* Secondary "log out everywhere" link, sits just under the main logout button */
+.logout-all-link {
+    display: block;
+    width: 100%;
+    margin: 0 0 14px;
+    padding: 2px 18px 0;
+    background: none;
+    border: none;
+    color: var(--wall-text);
+    opacity: .6;
+    font-size: .72rem;
+    text-align: center;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+    .logout-all-link:hover {
+        opacity: 1;
+        color: var(--danger);
+    }
+
 /* ============================================================
    Page header pattern
    ============================================================ */
