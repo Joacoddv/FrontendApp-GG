@@ -74,6 +74,25 @@ public sealed class AuthService : IAuthService
     }
 
     /// <inheritdoc />
+    public async Task LogoutAllAsync()
+    {
+        // Revoke every session of this user server-side. logout-all reads the user from the access
+        // token, so use the authenticated client (Bearer attached, refreshed by the handler if
+        // needed). Best-effort: a network/backend failure must not block the local logout.
+        try
+        {
+            var client = _httpClientFactory.CreateClient("AuthorizedApi");
+            await client.PostAsync("/auth/logout-all", content: null);
+        }
+        catch (HttpRequestException)
+        {
+            // Offline or backend unreachable — fall through and clear local state anyway.
+        }
+
+        await _authProvider.NotifyUserLogout();
+    }
+
+    /// <inheritdoc />
     public async Task<string?> GetTokenAsync()
     {
         return await _storage.GetItemAsStringAsync(CustomAuthenticationStateProvider.TokenKey);

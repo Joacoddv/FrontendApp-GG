@@ -1,5 +1,6 @@
 @inject IAuthService AuthService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <nav class="sidebar">
     <div class="sidebar-header">
@@ -36,12 +37,25 @@
         </AuthorizeView>
     </ul>
     <button class="btn logout-btn" @onclick="HandleLogout"><i class="fas fa-right-from-bracket"></i>Cerrar sesión</button>
+    <button class="logout-all-link" @onclick="HandleLogoutAll">en todos los dispositivos</button>
 </nav>
 
 @code {
     private async Task HandleLogout()
     {
         await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: false);
+    }
+
+    private async Task HandleLogoutAll()
+    {
+        var ok = await JS.InvokeAsync<bool>(
+            "confirm",
+            "¿Cerrar sesión en TODOS los dispositivos? Se revocarán todas tus sesiones activas.");
+        if (!ok)
+            return;
+
+        await AuthService.LogoutAllAsync();
         Navigation.NavigateTo("/login", forceLoad: false);
     }
 }
