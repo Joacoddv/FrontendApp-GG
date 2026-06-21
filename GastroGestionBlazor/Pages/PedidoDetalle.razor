@@ -51,7 +51,13 @@ else
         {
             <div class="detail-item" style="flex-basis:100%">
                 <label>Dirección de entrega</label>
-                <div>@FormatDireccion(dir)</div>
+                <div>
+                    @FormatDireccion(dir)
+                    <a class="btn btn-outline-secondary btn-sm ms-2" target="_blank" rel="noopener"
+                       href="@MapsUrl(dir)" title="Abrir en Google Maps">
+                        <i class="fas fa-map-location-dot"></i> Ver en el mapa
+                    </a>
+                </div>
             </div>
         }
     </div>
@@ -434,6 +440,13 @@ else
 
     private static string Money(decimal? monto, string? moneda)
         => monto is { } m ? $"{m:N2} {moneda}".Trim() : "—";
+
+    // Keyless Google Maps web link (no API key / billing needed) for the delivery address.
+    private static string MapsUrl(DireccionEntregaResponse d)
+    {
+        var query = $"{d.Calle} {d.Numero}, {d.Ciudad}, {d.Provincia} {d.CodigoPostal}";
+        return "https://www.google.com/maps/search/?api=1&query=" + Uri.EscapeDataString(query);
+    }
 
     private static string FormatDireccion(DireccionEntregaResponse d)
     {
