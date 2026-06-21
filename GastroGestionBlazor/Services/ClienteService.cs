@@ -67,6 +67,40 @@ public class ClienteService
             await ThrowApiExceptionAsync(response, "No se pudo eliminar el cliente.", ct);
     }
 
+    public async Task<ClienteResponse?> AgregarDireccionAsync(Guid clienteId, AgregarDireccionRequest req, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"clientes/{clienteId}/direcciones", req, JsonOptions, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo agregar la dirección.", ct);
+        return await response.Content.ReadFromJsonAsync<ClienteResponse>(JsonOptions, ct);
+    }
+
+    public async Task<ClienteResponse?> QuitarDireccionAsync(Guid clienteId, Guid direccionId, CancellationToken ct = default)
+    {
+        var response = await _httpClient.DeleteAsync($"clientes/{clienteId}/direcciones/{direccionId}", ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo quitar la dirección.", ct);
+        return await response.Content.ReadFromJsonAsync<ClienteResponse>(JsonOptions, ct);
+    }
+
+    public async Task<List<CumpleaneroResponse>> GetCumpleanerosAsync(int? mes = null, CancellationToken ct = default)
+    {
+        var url = mes is { } m ? $"clientes/cumpleaneros?mes={m}" : "clientes/cumpleaneros";
+        var response = await _httpClient.GetAsync(url, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo cargar los cumpleañeros.", ct);
+        return await response.Content.ReadFromJsonAsync<List<CumpleaneroResponse>>(JsonOptions, ct) ?? new();
+    }
+
+    public async Task<EnviarPromoResponse?> EnviarPromoCumpleanosAsync(int? mes = null, CancellationToken ct = default)
+    {
+        var url = mes is { } m ? $"clientes/cumpleaneros/enviar-promo?mes={m}" : "clientes/cumpleaneros/enviar-promo";
+        var response = await _httpClient.PostAsync(url, content: null, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo enviar las promociones.", ct);
+        return await response.Content.ReadFromJsonAsync<EnviarPromoResponse>(JsonOptions, ct);
+    }
+
     public async Task<Guid> CreateAsync(CrearClienteRequest request)
     {
         var response = await _httpClient.PostAsJsonAsync("clientes", request, JsonOptions);
