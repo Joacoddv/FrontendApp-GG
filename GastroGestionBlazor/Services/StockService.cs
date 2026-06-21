@@ -31,6 +31,17 @@ public sealed class StockService
         return result ?? new List<IngredienteBalanceResponse>();
     }
 
+    /// <summary>GET /stock/movimientos/{ingredienteId} — the ingredient's ledger, newest first.</summary>
+    public async Task<List<MovimientoStockResponse>> GetMovimientosAsync(Guid ingredienteId, CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync($"stock/movimientos/{ingredienteId}", ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudieron cargar los movimientos de stock.", ct);
+
+        var result = await response.Content.ReadFromJsonAsync<List<MovimientoStockResponse>>(JsonOptions, ct);
+        return result ?? new List<MovimientoStockResponse>();
+    }
+
     /// <summary>POST /stock/movimientos — register a manual movement (Compra / Merma / Ajuste).</summary>
     public async Task RegistrarMovimientoAsync(
         Guid ingredienteId, TipoMovimientoStock tipo, decimal cantidad, CancellationToken ct = default)
