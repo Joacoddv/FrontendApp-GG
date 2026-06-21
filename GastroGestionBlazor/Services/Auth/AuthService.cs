@@ -54,6 +54,22 @@ public sealed class AuthService : IAuthService
     /// <inheritdoc />
     public async Task LogoutAsync()
     {
+        // Best-effort server-side revocation so the refresh token can't be reused after logout.
+        // A network/backend hiccup must never block the local logout, so swallow failures.
+        var refreshToken = await _storage.GetItemAsStringAsync(CustomAuthenticationStateProvider.RefreshTokenKey);
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient("AuthApi");
+                await client.PostAsJsonAsync("/auth/logout", new RefreshTokenRequest(refreshToken));
+            }
+            catch (HttpRequestException)
+            {
+                // Offline or backend unreachable — fall through and clear local state anyway.
+            }
+        }
+
         await _authProvider.NotifyUserLogout();
     }
 
