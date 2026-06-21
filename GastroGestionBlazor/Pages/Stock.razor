@@ -67,6 +67,7 @@ else
                 <th>Unidad</th>
                 <th class="text-end">Balance</th>
                 <th>Estado</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -90,10 +91,53 @@ else
                             <span class="badge bg-success">OK</span>
                         }
                     </td>
+                    <td class="action-buttons">
+                        <button class="btn btn-info btn-sm" @onclick="() => VerMovimientos(b)" title="Ver movimientos"><i class="fas fa-clock-rotate-left"></i></button>
+                    </td>
                 </tr>
             }
         </tbody>
     </table>
+
+    @if (_histIngrediente is not null)
+    {
+        <div class="detail-container" style="flex-direction:column; align-items:stretch">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Movimientos — @_histIngrediente.Nombre</h5>
+                <button class="btn btn-secondary btn-sm" @onclick="CerrarMovimientos"><i class="fas fa-times"></i> Cerrar</button>
+            </div>
+            @if (_histLoading)
+            {
+                <p class="text-muted">Cargando&hellip;</p>
+            }
+            else if (_movimientos.Count == 0)
+            {
+                <p class="text-muted">Sin movimientos.</p>
+            }
+            else
+            {
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Movimiento</th>
+                            <th class="text-end">Cantidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in _movimientos)
+                        {
+                            <tr>
+                                <td>@m.FechaMovimiento.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                <td><span class="badge @TipoBadge(m.Tipo)">@TipoLabel(m.Tipo)</span></td>
+                                <td class="text-end @(m.Cantidad < 0 ? "text-danger" : "text-success")">@m.Cantidad.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
 }
 
 @code {
@@ -107,6 +151,10 @@ else
     private Guid _movIngredienteId = Guid.Empty;
     private TipoMovimientoStock _movTipo = TipoMovimientoStock.Compra;
     private decimal _movCantidad;
+
+    private IngredienteBalanceResponse? _histIngrediente;
+    private List<MovimientoStockResponse> _movimientos = new();
+    private bool _histLoading;
 
     protected override async Task OnInitializedAsync() => await CargarBalances();
 
@@ -127,6 +175,49 @@ else
             _isLoading = false;
         }
     }
+
+    private async Task VerMovimientos(IngredienteBalanceResponse ingrediente)
+    {
+        _histIngrediente = ingrediente;
+        _histLoading = true;
+        _movimientos = new();
+        try
+        {
+            _movimientos = await StockService.GetMovimientosAsync(ingrediente.IngredienteId);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _histLoading = false;
+        }
+    }
+
+    private void CerrarMovimientos() => _histIngrediente = null;
+
+    private static string TipoLabel(TipoMovimientoStock t) => t switch
+    {
+        TipoMovimientoStock.Compra                => "Compra",
+        TipoMovimientoStock.Consumo               => "Consumo",
+        TipoMovimientoStock.Ajuste                => "Ajuste",
+        TipoMovimientoStock.Reserva               => "Reserva",
+        TipoMovimientoStock.LiberacionReserva     => "Liberación de reserva",
+        TipoMovimientoStock.DevolucionCancelacion => "Devolución",
+        TipoMovimientoStock.Merma                 => "Merma",
+        _                                         => t.ToString()
+    };
+
+    private static string TipoBadge(TipoMovimientoStock t) => t switch
+    {
+        TipoMovimientoStock.Compra or TipoMovimientoStock.LiberacionReserva
+            or TipoMovimientoStock.DevolucionCancelacion => "bg-success",
+        TipoMovimientoStock.Merma                        => "bg-danger",
+        TipoMovimientoStock.Consumo or TipoMovimientoStock.Reserva => "bg-secondary",
+        TipoMovimientoStock.Ajuste                       => "bg-info text-dark",
+        _                                                => "bg-secondary"
+    };
 
     private async Task Registrar()
     {
@@ -151,6 +242,10 @@ else
             _ok = $"Movimiento registrado: {_movTipo} de {_movCantidad:N2}.";
             _movCantidad = 0;
             await CargarBalances();
+
+            // Keep an open history panel in sync if it shows the affected ingredient.
+            if (_histIngrediente is not null && _histIngrediente.IngredienteId == _movIngredienteId)
+                _movimientos = await StockService.GetMovimientosAsync(_movIngredienteId);
         }
         catch (ApiException ex)
         {

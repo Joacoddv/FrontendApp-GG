@@ -17,3 +17,11 @@ public sealed record RegistrarMovimientoStockRequest(
     decimal Cantidad,
     Guid? OrdenTrabajoId,
     Guid? LineaPedidoId);
+
+/// <summary>A single stock-ledger entry (GET /stock/movimientos/{ingredienteId}).</summary>
+public sealed record MovimientoStockResponse(
+    Guid Id,
+    Guid IngredienteId,
+    TipoMovimientoStock Tipo,
+    decimal Cantidad,
+    DateTime FechaMovimiento);
