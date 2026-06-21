@@ -79,6 +79,18 @@ public sealed class PedidoService
         return result ?? new List<PedidoResponse>();
     }
 
+    /// <summary>GET /pedidos/{id} — full order detail, or null if not found.</summary>
+    public async Task<PedidoResponse?> GetPedidoByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync($"pedidos/{id}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo cargar el pedido.", ct);
+
+        return await response.Content.ReadFromJsonAsync<PedidoResponse>(JsonOptions, ct);
+    }
+
     /// <summary>GET /mesas — active tables for the Salon picker.</summary>
     public async Task<List<MesaResponse>> GetMesasAsync(CancellationToken ct = default)
     {
