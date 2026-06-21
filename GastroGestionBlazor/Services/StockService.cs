@@ -54,9 +54,10 @@ public sealed class StockService
 
     /// <summary>POST /stock/movimientos — register a manual movement (Compra / Merma / Ajuste).</summary>
     public async Task RegistrarMovimientoAsync(
-        Guid ingredienteId, TipoMovimientoStock tipo, decimal cantidad, CancellationToken ct = default)
+        Guid ingredienteId, TipoMovimientoStock tipo, decimal cantidad,
+        Guid? proveedorId = null, CancellationToken ct = default)
     {
-        var request = new RegistrarMovimientoStockRequest(ingredienteId, tipo, cantidad, null, null);
+        var request = new RegistrarMovimientoStockRequest(ingredienteId, tipo, cantidad, null, null, proveedorId);
         var response = await _httpClient.PostAsJsonAsync("stock/movimientos", request, JsonOptions, ct);
         if (!response.IsSuccessStatusCode)
             await ThrowApiExceptionAsync(response, "No se pudo registrar el movimiento de stock.", ct);
