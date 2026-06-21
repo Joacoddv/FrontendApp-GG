@@ -123,6 +123,31 @@ public sealed class PedidoService
         return await response.Content.ReadFromJsonAsync<PedidoResponse>(JsonOptions, ct);
     }
 
+    /// <summary>DELETE /pedidos/{id}/lineas/{lineaId} — removes a line and returns the updated order.</summary>
+    public async Task<PedidoResponse?> QuitarLineaAsync(Guid pedidoId, Guid lineaId, CancellationToken ct = default)
+    {
+        var response = await _httpClient.DeleteAsync($"pedidos/{pedidoId}/lineas/{lineaId}", ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo quitar la línea del pedido.", ct);
+
+        return await response.Content.ReadFromJsonAsync<PedidoResponse>(JsonOptions, ct);
+    }
+
+    /// <summary>
+    /// POST /pedidos/{id}/lineas/{lineaId}/orden-trabajo — generates the kitchen work order for a
+    /// single (newly added, already priced) line and returns the updated order.
+    /// </summary>
+    public async Task<PedidoResponse?> GenerarOrdenTrabajoLineaAsync(
+        Guid pedidoId, Guid lineaId, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PostAsync(
+            $"pedidos/{pedidoId}/lineas/{lineaId}/orden-trabajo", content: null, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo generar la orden de trabajo de la línea.", ct);
+
+        return await response.Content.ReadFromJsonAsync<PedidoResponse>(JsonOptions, ct);
+    }
+
     /// <summary>GET /mesas — active tables for the Salon picker.</summary>
     public async Task<List<MesaResponse>> GetMesasAsync(CancellationToken ct = default)
     {
