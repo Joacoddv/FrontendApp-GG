@@ -107,6 +107,22 @@ public sealed class PedidoService
         return await response.Content.ReadFromJsonAsync<PedidoResponse>(JsonOptions, ct);
     }
 
+    /// <summary>
+    /// PUT /pedidos/{id}/lineas/{lineaId} — edits an existing line's quantity/notes and returns
+    /// the updated order. The backend enforces the edit-lock rules and recomputes line totals.
+    /// </summary>
+    public async Task<PedidoResponse?> ActualizarLineaAsync(
+        Guid pedidoId, Guid lineaId, int cantidad, string? observaciones, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PutAsJsonAsync(
+            $"pedidos/{pedidoId}/lineas/{lineaId}",
+            new ActualizarLineaRequest(cantidad, observaciones), JsonOptions, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo actualizar la línea del pedido.", ct);
+
+        return await response.Content.ReadFromJsonAsync<PedidoResponse>(JsonOptions, ct);
+    }
+
     /// <summary>GET /mesas — active tables for the Salon picker.</summary>
     public async Task<List<MesaResponse>> GetMesasAsync(CancellationToken ct = default)
     {
