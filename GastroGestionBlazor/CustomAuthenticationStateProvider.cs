@@ -12,39 +12,37 @@ public sealed class CustomAuthenticationStateProvider : AuthenticationStateProvi
     // Storage keys shared with BearerTokenHandler and AuthService.
     internal const string TokenKey = "gg_token";
     internal const string ExpiryKey = "gg_token_expiry";
+    internal const string RefreshTokenKey = "gg_refresh_token";
+    internal const string RefreshExpiryKey = "gg_refresh_token_expiry";
 
     // Full ClaimTypes.Role URI — PINNED so AuthorizeView Roles/IsInRole resolve. ADR-3.
     private const string RoleUri = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
 
     private readonly ILocalStorageService _storage;
+    private readonly TokenRefreshService _tokenRefresher;
 
-    public CustomAuthenticationStateProvider(ILocalStorageService storage)
+    public CustomAuthenticationStateProvider(ILocalStorageService storage, TokenRefreshService tokenRefresher)
     {
         _storage = storage;
+        _tokenRefresher = tokenRefresher;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         var token = await _storage.GetItemAsStringAsync(TokenKey);
 
-        if (string.IsNullOrWhiteSpace(token))
-            return Anonymous();
-
-        // Check stored expiry first (fast path, no JWT decode needed).
-        var expiryStr = await _storage.GetItemAsStringAsync(ExpiryKey);
-        if (DateTime.TryParse(expiryStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out var storedExpiry)
-            && storedExpiry <= DateTime.UtcNow)
+        // Access token absent or expired? Try a silent rotation off the refresh token before
+        // declaring the user anonymous — otherwise an expired access token logs them out on the
+        // next navigation even while the refresh token is still valid. TryRefreshAsync returns
+        // null fast (no HTTP) when there is no refresh token, so a logged-out browser is cheap.
+        if (string.IsNullOrWhiteSpace(token) || await IsAccessTokenExpiredAsync(token))
         {
-            await ClearStorageAsync();
-            return Anonymous();
-        }
-
-        // Parse JWT and validate its own exp claim.
-        var jwtExpiry = JwtPayloadParser.GetExpiryUtc(token);
-        if (jwtExpiry.HasValue && jwtExpiry.Value <= DateTime.UtcNow)
-        {
-            await ClearStorageAsync();
-            return Anonymous();
+            token = await _tokenRefresher.TryRefreshAsync(token);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                await ClearStorageAsync();
+                return Anonymous();
+            }
         }
 
         var claims = JwtPayloadParser.ParseClaims(token).ToList();
@@ -63,12 +61,18 @@ public sealed class CustomAuthenticationStateProvider : AuthenticationStateProvi
     }
 
     /// <summary>
-    /// Called after a successful login. Persists token+expiry and notifies subscribers.
+    /// Called after a successful login. Persists the token pair + expiries and notifies subscribers.
     /// </summary>
-    public async Task NotifyUserAuthentication(string token, DateTime expiresAtUtc)
+    public async Task NotifyUserAuthentication(
+        string token,
+        DateTime expiresAtUtc,
+        string refreshToken,
+        DateTime refreshTokenExpiresAtUtc)
     {
         await _storage.SetItemAsStringAsync(TokenKey, token);
         await _storage.SetItemAsStringAsync(ExpiryKey, expiresAtUtc.ToString("O"));
+        await _storage.SetItemAsStringAsync(RefreshTokenKey, refreshToken);
+        await _storage.SetItemAsStringAsync(RefreshExpiryKey, refreshTokenExpiresAtUtc.ToString("O"));
 
         var claims = JwtPayloadParser.ParseClaims(token).ToList();
         var identity = new ClaimsIdentity(claims, "jwt", ClaimTypes.Email, RoleUri);
@@ -91,9 +95,20 @@ public sealed class CustomAuthenticationStateProvider : AuthenticationStateProvi
     private static AuthenticationState Anonymous()
         => new(new ClaimsPrincipal(new ClaimsIdentity()));
 
-    private async Task ClearStorageAsync()
+    /// <summary>
+    /// True when the stored expiry has passed or the JWT's own exp claim has. The stored expiry
+    /// is the fast path (no JWT decode); the exp claim is the backstop if storage drifts.
+    /// </summary>
+    private async Task<bool> IsAccessTokenExpiredAsync(string token)
     {
-        await _storage.RemoveItemAsync(TokenKey);
-        await _storage.RemoveItemAsync(ExpiryKey);
+        var expiryStr = await _storage.GetItemAsStringAsync(ExpiryKey);
+        if (DateTime.TryParse(expiryStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out var storedExpiry)
+            && storedExpiry <= DateTime.UtcNow)
+            return true;
+
+        var jwtExpiry = JwtPayloadParser.GetExpiryUtc(token);
+        return jwtExpiry.HasValue && jwtExpiry.Value <= DateTime.UtcNow;
     }
+
+    private Task ClearStorageAsync() => _tokenRefresher.ClearAsync();
 }

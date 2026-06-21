@@ -23,6 +23,11 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<CustomAuthenticationStateProvider>());
 builder.Services.AddScoped<IAuthService, AuthService>();
 
+// Silent token-rotation service shared by the handler (reactive, on 401) and the auth-state
+// provider (proactive, on navigation with an expired access token). Uses the "AuthApi" client
+// only, so it never closes the AuthorizedApi -> BearerTokenHandler DI cycle.
+builder.Services.AddScoped<TokenRefreshService>();
+
 // 3. BearerTokenHandler must be registered before the named client that uses it. ADR-4.
 builder.Services.AddTransient<BearerTokenHandler>();
 
