@@ -26,3 +26,6 @@ public sealed record AgregarLineaRequest(
     Guid PlatoId,
     int Cantidad,
     string? Observaciones);
+
+/// <summary>Request body for POST /pedidos/{id}/transicion.</summary>
+public sealed record TransicionarEstadoRequest(EstadoPedido EstadoNuevo);
