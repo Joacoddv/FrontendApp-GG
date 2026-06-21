@@ -1,0 +1,168 @@
+@page "/stock"
+@attribute [Authorize(Roles = "Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Stock
+@using GastroGestionBlazor.Contracts.Common
+@inject StockService StockService
+
+<PageTitle>Stock · GastroGestión</PageTitle>
+
+<h3>Stock</h3>
+<hr class="custom-line" />
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+@if (!string.IsNullOrEmpty(_ok))
+{
+    <div class="alert alert-success" role="alert">@_ok</div>
+}
+
+<div class="search-container">
+    <div class="form-group">
+        <label>Ingrediente</label>
+        <select class="form-control" @bind="_movIngredienteId">
+            <option value="@Guid.Empty">— Elegir —</option>
+            @foreach (var b in _balances)
+            {
+                <option value="@b.IngredienteId">@b.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Movimiento</label>
+        <select class="form-control" @bind="_movTipo">
+            <option value="@TipoMovimientoStock.Compra">Compra (ingreso)</option>
+            <option value="@TipoMovimientoStock.Merma">Merma / desperdicio (egreso)</option>
+            <option value="@TipoMovimientoStock.Ajuste">Ajuste (ingreso)</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Cantidad</label>
+        <input type="number" min="0" step="0.01" class="form-control" @bind="_movCantidad" placeholder="Cantidad" />
+    </div>
+    <div class="form-group">
+        <button class="btn btn-primary" disabled="@_saving" @onclick="Registrar">
+            @(_saving ? "Registrando..." : "Registrar movimiento")
+        </button>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <p>Cargando&hellip;</p>
+}
+else if (_balances.Count == 0)
+{
+    <p class="text-muted">No hay ingredientes.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Ingrediente</th>
+                <th>Unidad</th>
+                <th class="text-end">Balance</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var b in _balances)
+            {
+                <tr class="@(b.Activo ? "" : "text-muted")">
+                    <td>@b.Nombre</td>
+                    <td>@b.Unidad</td>
+                    <td class="text-end @(b.Balance < 0 ? "text-danger fw-bold" : "")">@b.Balance.ToString("N2")</td>
+                    <td>
+                        @if (b.Balance <= 0)
+                        {
+                            <span class="badge bg-danger">Sin stock</span>
+                        }
+                        else if (b.Balance < 100)
+                        {
+                            <span class="badge bg-warning text-dark">Bajo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">OK</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _saving;
+    private string? _error;
+    private string? _ok;
+
+    private List<IngredienteBalanceResponse> _balances = new();
+
+    private Guid _movIngredienteId = Guid.Empty;
+    private TipoMovimientoStock _movTipo = TipoMovimientoStock.Compra;
+    private decimal _movCantidad;
+
+    protected override async Task OnInitializedAsync() => await CargarBalances();
+
+    private async Task CargarBalances()
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            _balances = await StockService.GetBalancesAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task Registrar()
+    {
+        _error = null;
+        _ok = null;
+
+        if (_movIngredienteId == Guid.Empty)
+        {
+            _error = "Elegí un ingrediente.";
+            return;
+        }
+        if (_movCantidad <= 0)
+        {
+            _error = "La cantidad debe ser mayor a cero.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            await StockService.RegistrarMovimientoAsync(_movIngredienteId, _movTipo, _movCantidad);
+            _ok = $"Movimiento registrado: {_movTipo} de {_movCantidad:N2}.";
+            _movCantidad = 0;
+            await CargarBalances();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

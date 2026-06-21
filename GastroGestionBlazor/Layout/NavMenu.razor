@@ -26,6 +26,11 @@
         <li class="nav-item">
             <NavLink class="nav-link" href="ingredientes"><i class="fas fa-carrot"></i>Ingredientes</NavLink>
         </li>
+        <AuthorizeView Roles="Administrador">
+            <li class="nav-item">
+                <NavLink class="nav-link" href="stock"><i class="fas fa-boxes-stacked"></i>Stock</NavLink>
+            </li>
+        </AuthorizeView>
         <li class="nav-item">
             <NavLink class="nav-link" href="menu"><i class="fas fa-book-open"></i>Menú</NavLink>
         </li>
