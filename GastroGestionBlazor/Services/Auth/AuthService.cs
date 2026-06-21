@@ -41,8 +41,12 @@ public sealed class AuthService : IAuthService
         if (loginResponse is null)
             return false;
 
-        // Persist token and notify auth state (single responsibility in the provider).
-        await _authProvider.NotifyUserAuthentication(loginResponse.AccessToken, loginResponse.ExpiresAtUtc);
+        // Persist the token pair and notify auth state (single responsibility in the provider).
+        await _authProvider.NotifyUserAuthentication(
+            loginResponse.AccessToken,
+            loginResponse.ExpiresAtUtc,
+            loginResponse.RefreshToken,
+            loginResponse.RefreshTokenExpiresAtUtc);
 
         return true;
     }
