@@ -110,9 +110,55 @@ else
                 <label>Estado:</label>
                 <input value="@(clienteSeleccionado.Activo ? "Activo" : "Inactivo")" disabled />
             </div>
-            <div class="mt-3">
-                <button class="btn btn-secondary" @onclick="CerrarDetalle">Cerrar</button>
+            <div class="detail-item">
+                <label>Cumpleaños:</label>
+                <input value="@(clienteSeleccionado.FechaNacimiento?.ToString("dd/MM/yyyy") ?? "—")" disabled />
             </div>
+        </div>
+
+        <h5 class="mt-3">Direcciones</h5>
+        @if (clienteSeleccionado.Direcciones is null || clienteSeleccionado.Direcciones.Count == 0)
+        {
+            <p class="text-muted">Sin direcciones.</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead><tr><th>Dirección</th><th>Ciudad</th><th>Provincia</th><th>CP</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var d in clienteSeleccionado.Direcciones)
+                    {
+                        <tr>
+                            <td>@d.Calle @d.Numero@(string.IsNullOrEmpty(d.Piso) ? "" : $", piso {d.Piso}")@(string.IsNullOrEmpty(d.Departamento) ? "" : $" dto. {d.Departamento}")</td>
+                            <td>@d.Ciudad</td>
+                            <td>@d.Provincia</td>
+                            <td>@d.CodigoPostal</td>
+                            <td class="action-buttons">
+                                <button class="btn btn-danger btn-sm" title="Quitar" @onclick="() => QuitarDireccion(d.Id)"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (!string.IsNullOrEmpty(direccionError))
+        {
+            <p class="text-danger">@direccionError</p>
+        }
+        <div class="d-flex gap-2 flex-wrap align-items-end mb-2">
+            <input @bind="nuevaDireccion.Calle" class="form-control" style="width:160px" placeholder="Calle *" />
+            <input @bind="nuevaDireccion.Numero" class="form-control" style="width:90px" placeholder="Número *" />
+            <input @bind="nuevaDireccion.Ciudad" class="form-control" style="width:140px" placeholder="Ciudad *" />
+            <input @bind="nuevaDireccion.Provincia" class="form-control" style="width:140px" placeholder="Provincia *" />
+            <input @bind="nuevaDireccion.CodigoPostal" class="form-control" style="width:90px" placeholder="CP *" />
+            <input @bind="nuevaDireccion.Piso" class="form-control" style="width:80px" placeholder="Piso" />
+            <input @bind="nuevaDireccion.Departamento" class="form-control" style="width:80px" placeholder="Dto." />
+            <button class="btn btn-secondary" disabled="@isSaving" @onclick="AgregarDireccion"><i class="fas fa-plus"></i> Agregar dirección</button>
+        </div>
+
+        <div class="mt-3">
+            <button class="btn btn-secondary" @onclick="CerrarDetalle">Cerrar</button>
         </div>
         <div class="footer-spacing"></div>
     }
@@ -145,6 +191,10 @@ else
             <div class="detail-item">
                 <label>Email:</label>
                 <input @bind="editModel.Email" class="form-control" />
+            </div>
+            <div class="detail-item">
+                <label>Cumpleaños:</label>
+                <input type="date" @bind="editModel.FechaNacimiento" class="form-control" />
             </div>
             <div class="mt-3">
                 <button class="btn btn-primary" @onclick="GuardarEdicionCliente" disabled="@isSaving">
@@ -185,6 +235,10 @@ else
         <div class="detail-item">
             <label>Email:</label>
             <input @bind="nuevoCliente.Email" class="form-control" />
+        </div>
+        <div class="detail-item">
+            <label>Cumpleaños:</label>
+            <input type="date" @bind="nuevoCliente.FechaNacimiento" class="form-control" />
         </div>
         <div class="mt-3">
             <button class="btn btn-primary" @onclick="GuardarCliente" disabled="@isSaving">
@@ -256,7 +310,8 @@ else
             Nombre = cliente.Nombre,
             CondicionIVA = cliente.CondicionIVA,
             Cuit = cliente.Cuit,
-            Email = cliente.Email
+            Email = cliente.Email,
+            FechaNacimiento = cliente.FechaNacimiento
         };
         editErrorMessage = null;
         showEditForm = true;
@@ -301,7 +356,8 @@ else
                 editModel.Nombre,
                 editModel.CondicionIVA,
                 string.IsNullOrWhiteSpace(editModel.Cuit) ? null : editModel.Cuit,
-                string.IsNullOrWhiteSpace(editModel.Email) ? null : editModel.Email);
+                string.IsNullOrWhiteSpace(editModel.Email) ? null : editModel.Email,
+                editModel.FechaNacimiento);
 
             await ClienteService.UpdateAsync(clienteEnEdicion.Id, req);
             CerrarEdicion();
@@ -358,7 +414,8 @@ else
                 nuevoCliente.Nombre,
                 nuevoCliente.CondicionIVA,
                 string.IsNullOrWhiteSpace(nuevoCliente.Cuit) ? null : nuevoCliente.Cuit,
-                string.IsNullOrWhiteSpace(nuevoCliente.Email) ? null : nuevoCliente.Email);
+                string.IsNullOrWhiteSpace(nuevoCliente.Email) ? null : nuevoCliente.Email,
+                nuevoCliente.FechaNacimiento);
 
             await ClienteService.CreateAsync(request);
             showCreateForm = false;
@@ -391,6 +448,7 @@ else
         public CondicionIVA CondicionIVA { get; set; } = CondicionIVA.ConsumidorFinal;
         public string? Cuit { get; set; }
         public string? Email { get; set; }
+        public DateOnly? FechaNacimiento { get; set; }
     }
 
     // Mutable view-model for the edit form
@@ -400,5 +458,69 @@ else
         public CondicionIVA CondicionIVA { get; set; } = CondicionIVA.ConsumidorFinal;
         public string? Cuit { get; set; }
         public string? Email { get; set; }
+        public DateOnly? FechaNacimiento { get; set; }
+    }
+
+    // ── Direcciones (in the detail panel) ──────────────────────────────────────
+    private string? direccionError;
+    private DireccionModel nuevaDireccion = new();
+
+    private class DireccionModel
+    {
+        public string? Calle { get; set; }
+        public string? Numero { get; set; }
+        public string? Ciudad { get; set; }
+        public string? Provincia { get; set; }
+        public string? CodigoPostal { get; set; }
+        public string? Piso { get; set; }
+        public string? Departamento { get; set; }
+
+        public void Reset() { Calle = Numero = Ciudad = Provincia = CodigoPostal = Piso = Departamento = null; }
+    }
+
+    private async Task AgregarDireccion()
+    {
+        if (clienteSeleccionado is null) return;
+        direccionError = null;
+
+        if (string.IsNullOrWhiteSpace(nuevaDireccion.Calle) || string.IsNullOrWhiteSpace(nuevaDireccion.Numero) ||
+            string.IsNullOrWhiteSpace(nuevaDireccion.Ciudad) || string.IsNullOrWhiteSpace(nuevaDireccion.Provincia) ||
+            string.IsNullOrWhiteSpace(nuevaDireccion.CodigoPostal))
+        {
+            direccionError = "Calle, número, ciudad, provincia y CP son obligatorios.";
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+            var req = new AgregarDireccionRequest(
+                nuevaDireccion.Calle!.Trim(), nuevaDireccion.Numero!.Trim(), nuevaDireccion.Ciudad!.Trim(),
+                nuevaDireccion.Provincia!.Trim(), nuevaDireccion.CodigoPostal!.Trim(),
+                string.IsNullOrWhiteSpace(nuevaDireccion.Piso) ? null : nuevaDireccion.Piso!.Trim(),
+                string.IsNullOrWhiteSpace(nuevaDireccion.Departamento) ? null : nuevaDireccion.Departamento!.Trim());
+
+            var updated = await ClienteService.AgregarDireccionAsync(clienteSeleccionado.Id, req);
+            if (updated is not null) clienteSeleccionado = updated;
+            nuevaDireccion.Reset();
+            await BuscarClientes();
+        }
+        catch (ApiException ex) { direccionError = ex.Message; }
+        catch (Exception ex) { direccionError = ex.Message; }
+        finally { isSaving = false; }
+    }
+
+    private async Task QuitarDireccion(Guid direccionId)
+    {
+        if (clienteSeleccionado is null) return;
+        direccionError = null;
+        try
+        {
+            var updated = await ClienteService.QuitarDireccionAsync(clienteSeleccionado.Id, direccionId);
+            if (updated is not null) clienteSeleccionado = updated;
+            await BuscarClientes();
+        }
+        catch (ApiException ex) { direccionError = ex.Message; }
+        catch (Exception ex) { direccionError = ex.Message; }
     }
 }

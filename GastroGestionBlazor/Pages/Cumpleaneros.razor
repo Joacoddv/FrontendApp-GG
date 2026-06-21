@@ -1,0 +1,117 @@
+@page "/cumpleaneros"
+@attribute [Authorize(Roles = "Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Clientes
+@using GastroGestionBlazor.Contracts.Common
+@inject ClienteService ClienteService
+
+<PageTitle>Cumpleañeros · GastroGestión</PageTitle>
+
+<h3>Cumpleañeros</h3>
+<hr class="custom-line" />
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+@if (!string.IsNullOrEmpty(_ok))
+{
+    <div class="alert alert-success" role="alert">@_ok</div>
+}
+
+<div class="search-container">
+    <div class="form-group">
+        <label>Mes</label>
+        <select class="form-control" @bind="_mes" @bind:after="Cargar">
+            @for (var m = 1; m <= 12; m++)
+            {
+                <option value="@m">@MesNombre(m)</option>
+            }
+        </select>
+    </div>
+    <div class="form-group">
+        <button class="btn btn-primary" disabled="@(_enviando || _cumpleaneros.Count == 0)" @onclick="EnviarPromos">
+            <i class="fas fa-envelope"></i> @(_enviando ? "Enviando..." : "Enviar promos del mes")
+        </button>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <p>Cargando&hellip;</p>
+}
+else if (_cumpleaneros.Count == 0)
+{
+    <p class="text-muted">No hay clientes que cumplan años en @MesNombre(_mes).</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr><th>Cliente</th><th>Cumpleaños</th><th>Email</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var c in _cumpleaneros)
+            {
+                <tr>
+                    <td>@c.Nombre</td>
+                    <td>@c.FechaNacimiento.ToString("dd/MM")</td>
+                    <td>@(string.IsNullOrEmpty(c.Email) ? "— (sin email)" : c.Email)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _enviando;
+    private string? _error;
+    private string? _ok;
+    private int _mes = DateTime.Now.Month;
+    private List<CumpleaneroResponse> _cumpleaneros = new();
+
+    protected override async Task OnInitializedAsync() => await Cargar();
+
+    private async Task Cargar()
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            _cumpleaneros = await ClienteService.GetCumpleanerosAsync(_mes);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task EnviarPromos()
+    {
+        _error = null;
+        _ok = null;
+        _enviando = true;
+        try
+        {
+            var result = await ClienteService.EnviarPromoCumpleanosAsync(_mes);
+            if (result is not null)
+                _ok = $"Promos enviadas: {result.Enviados}." +
+                      (result.SinEmail > 0 ? $" ({result.SinEmail} sin email, no recibieron)." : "");
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _enviando = false; }
+    }
+
+    private static string MesNombre(int m) => m switch
+    {
+        1 => "Enero", 2 => "Febrero", 3 => "Marzo", 4 => "Abril", 5 => "Mayo", 6 => "Junio",
+        7 => "Julio", 8 => "Agosto", 9 => "Septiembre", 10 => "Octubre", 11 => "Noviembre", 12 => "Diciembre",
+        _ => m.ToString()
+    };
+}

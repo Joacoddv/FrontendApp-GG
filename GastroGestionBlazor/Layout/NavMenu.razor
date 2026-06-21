@@ -19,6 +19,11 @@
         <li class="nav-item">
             <NavLink class="nav-link" href="clientes"><i class="fas fa-users"></i>Clientes</NavLink>
         </li>
+        <AuthorizeView Roles="Administrador">
+            <li class="nav-item">
+                <NavLink class="nav-link" href="cumpleaneros"><i class="fas fa-cake-candles"></i>Cumpleañeros</NavLink>
+            </li>
+        </AuthorizeView>
         <li class="nav-item">
             <NavLink class="nav-link" href="pedidos"><i class="fas fa-receipt"></i>Pedidos</NavLink>
         </li>

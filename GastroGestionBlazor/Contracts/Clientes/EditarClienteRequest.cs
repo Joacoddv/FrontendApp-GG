@@ -6,4 +6,5 @@ public sealed record EditarClienteRequest(
     string Nombre,
     CondicionIVA CondicionIVA,
     string? Cuit,
-    string? Email);
+    string? Email,
+    DateOnly? FechaNacimiento = null);
