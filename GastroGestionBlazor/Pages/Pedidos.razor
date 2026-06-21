@@ -56,6 +56,7 @@ else
                 <th>Cliente</th>
                 <th class="text-end">Ítems</th>
                 <th class="text-end">Total</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -69,6 +70,9 @@ else
                     <td>@ClienteLabel(p.ClienteId)</td>
                     <td class="text-end">@p.Lineas.Sum(l => l.Cantidad)</td>
                     <td class="text-end">@FormatTotal(p)</td>
+                    <td class="action-buttons">
+                        <button class="btn btn-info btn-sm" @onclick="() => VerDetalle(p.Id)" title="Ver detalle"><i class="fas fa-eye"></i></button>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -121,6 +125,7 @@ else
     }
 
     private void NuevoPedido() => Navigation.NavigateTo("/pedidos/nuevo");
+    private void VerDetalle(Guid id) => Navigation.NavigateTo($"/pedidos/{id}");
 
     private string MesaLabel(Guid? mesaId)
         => mesaId is { } id && _mesas.TryGetValue(id, out var label) ? label : "—";

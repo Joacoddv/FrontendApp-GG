@@ -1,0 +1,175 @@
+@page "/pedidos/{Id:guid}"
+@attribute [Authorize(Roles = "Mozo,Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Platos
+@using GastroGestionBlazor.Contracts.Pedidos
+@inject PedidoService PedidoService
+@inject PlatoService PlatoService
+@inject ClienteService ClienteService
+@inject NavigationManager Navigation
+
+<PageTitle>Detalle de pedido · GastroGestión</PageTitle>
+
+<h3>Detalle de pedido</h3>
+<hr class="custom-line" />
+
+<div class="form-row">
+    <button class="btn btn-secondary" @onclick="Volver"><i class="fas fa-arrow-left"></i> Volver a pedidos</button>
+</div>
+
+@if (_isLoading)
+{
+    <p>Cargando&hellip;</p>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <p class="text-danger">@_error</p>
+}
+else if (_pedido is null)
+{
+    <p class="text-muted">No se encontró el pedido.</p>
+}
+else
+{
+    <div class="detail-container">
+        <div class="detail-item"><label>Tipo</label><div>@GetTipoLabel(_pedido.Tipo)</div></div>
+        <div class="detail-item"><label>Estado</label><div><span class="badge @EstadoBadge(_pedido.Estado)">@_pedido.Estado</span></div></div>
+        <div class="detail-item"><label>Fecha</label><div>@_pedido.CreadoEnUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div></div>
+        <div class="detail-item"><label>Cliente</label><div>@ClienteLabel(_pedido.ClienteId)</div></div>
+
+        @if (_pedido.Tipo == TipoPedido.Salon)
+        {
+            <div class="detail-item"><label>Mesa</label><div>@MesaLabel(_pedido.MesaId)</div></div>
+        }
+        else if (_pedido.Tipo == TipoPedido.Delivery && _pedido.DireccionEntrega is { } dir)
+        {
+            <div class="detail-item" style="flex-basis:100%">
+                <label>Dirección de entrega</label>
+                <div>@FormatDireccion(dir)</div>
+            </div>
+        }
+    </div>
+
+    <h5 class="mt-4">Platos</h5>
+    @if (_pedido.Lineas.Count == 0)
+    {
+        <p class="text-muted">El pedido no tiene líneas.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Plato</th>
+                    <th class="text-end">Cant.</th>
+                    <th class="text-end">Precio unit.</th>
+                    <th class="text-end">IVA</th>
+                    <th class="text-end">Subtotal</th>
+                    <th class="text-end">Total</th>
+                    <th>Observaciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in _pedido.Lineas)
+                {
+                    <tr>
+                        <td>@PlatoLabel(l.PlatoId)</td>
+                        <td class="text-end">@l.Cantidad</td>
+                        <td class="text-end">@Money(l.PrecioUnitario, l.Moneda)</td>
+                        <td class="text-end">@(l.IvaTasa is { } t ? t.ToString("P1") : "—")</td>
+                        <td class="text-end">@Money(l.SubtotalLinea, l.Moneda)</td>
+                        <td class="text-end">@Money(l.TotalLinea, l.Moneda)</td>
+                        <td>@(string.IsNullOrWhiteSpace(l.Observaciones) ? "—" : l.Observaciones)</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="5" class="text-end">Total del pedido</th>
+                    <th class="text-end">@TotalPedido()</th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private string? _error;
+    private PedidoResponse? _pedido;
+
+    private Dictionary<Guid, string> _platos = new();
+    private Dictionary<Guid, string> _mesas = new();
+    private Dictionary<Guid, string> _clientes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _platos = (await PlatoService.GetAllAsync()).ToDictionary(p => p.Id, p => p.Nombre);
+            _mesas = (await PedidoService.GetMesasAsync()).ToDictionary(m => m.Id, m => $"Mesa {m.Numero}");
+            _clientes = (await ClienteService.GetAllAsync()).ToDictionary(c => c.Id, c => c.Nombre);
+            _pedido = await PedidoService.GetPedidoByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Volver() => Navigation.NavigateTo("/pedidos");
+
+    private string PlatoLabel(Guid platoId)
+        => _platos.TryGetValue(platoId, out var n) ? n : "(plato)";
+
+    private string MesaLabel(Guid? mesaId)
+        => mesaId is { } id && _mesas.TryGetValue(id, out var label) ? label : "—";
+
+    private string ClienteLabel(Guid? clienteId)
+        => clienteId is { } id && _clientes.TryGetValue(id, out var label) ? label : "Sin cliente";
+
+    private string TotalPedido()
+    {
+        var total = _pedido!.Lineas.Sum(l => l.TotalLinea ?? 0m);
+        var moneda = _pedido.Lineas.FirstOrDefault(l => l.Moneda is not null)?.Moneda ?? "";
+        return total == 0m ? "—" : $"{total:N2} {moneda}".Trim();
+    }
+
+    private static string Money(decimal? monto, string? moneda)
+        => monto is { } m ? $"{m:N2} {moneda}".Trim() : "—";
+
+    private static string FormatDireccion(DireccionEntregaResponse d)
+    {
+        var linea = $"{d.Calle} {d.Numero}";
+        if (!string.IsNullOrWhiteSpace(d.Piso)) linea += $", piso {d.Piso}";
+        if (!string.IsNullOrWhiteSpace(d.Departamento)) linea += $" dto. {d.Departamento}";
+        return $"{linea} — {d.Ciudad}, {d.Provincia} (CP {d.CodigoPostal})";
+    }
+
+    private static string GetTipoLabel(TipoPedido t) => t switch
+    {
+        TipoPedido.Salon    => "Salón",
+        TipoPedido.TakeAway => "TakeAway",
+        TipoPedido.Delivery => "Delivery",
+        _                   => t.ToString()
+    };
+
+    private static string EstadoBadge(string estado) => estado switch
+    {
+        "Abierto" or "Creado"    => "bg-primary",
+        "Modificado"             => "bg-secondary",
+        "Preparandose"           => "bg-warning text-dark",
+        "ListoParaEntregar"      => "bg-info text-dark",
+        "Entregado" or "Cerrado" => "bg-success",
+        "Cancelado"              => "bg-danger",
+        _                        => "bg-secondary"
+    };
+}
