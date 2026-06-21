@@ -43,7 +43,7 @@ else if (_data is not null)
     </div>
 
     <div class="d-flex gap-4 flex-wrap">
-        <div style="flex:1 1 280px">
+        <div style="flex:1 1 320px">
             <h5>Pedidos por estado</h5>
             @if (_data.PedidosPorEstado.Count == 0)
             {
@@ -51,19 +51,20 @@ else if (_data is not null)
             }
             else
             {
-                <table class="table">
-                    <thead><tr><th>Estado</th><th class="text-end">Cantidad</th></tr></thead>
-                    <tbody>
-                        @foreach (var e in _data.PedidosPorEstado)
-                        {
-                            <tr><td>@e.Estado</td><td class="text-end">@e.Cantidad</td></tr>
-                        }
-                    </tbody>
-                </table>
+                var maxE = _data.PedidosPorEstado.Max(x => x.Cantidad);
+                @foreach (var e in _data.PedidosPorEstado)
+                {
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div style="width:120px" class="text-truncate">@e.Estado</div>
+                        <div style="flex:1 1 auto; background:#eee; border-radius:4px; overflow:hidden">
+                            <div style="width:@(BarPct(e.Cantidad, maxE))%; background:var(--copper, #b5651d); color:#fff; padding:2px 6px; border-radius:4px; min-width:24px; text-align:right; font-size:.8rem">@e.Cantidad</div>
+                        </div>
+                    </div>
+                }
             }
         </div>
 
-        <div style="flex:1 1 280px">
+        <div style="flex:1 1 320px">
             <h5>Platos más pedidos</h5>
             @if (_data.TopPlatos.Count == 0)
             {
@@ -71,15 +72,16 @@ else if (_data is not null)
             }
             else
             {
-                <table class="table">
-                    <thead><tr><th>Plato</th><th class="text-end">Unidades</th></tr></thead>
-                    <tbody>
-                        @foreach (var p in _data.TopPlatos)
-                        {
-                            <tr><td>@p.Plato</td><td class="text-end">@p.Cantidad</td></tr>
-                        }
-                    </tbody>
-                </table>
+                var maxP = _data.TopPlatos.Max(x => x.Cantidad);
+                @foreach (var p in _data.TopPlatos)
+                {
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div style="width:120px" class="text-truncate" title="@p.Plato">@p.Plato</div>
+                        <div style="flex:1 1 auto; background:#eee; border-radius:4px; overflow:hidden">
+                            <div style="width:@(BarPct(p.Cantidad, maxP))%; background:#2e7d32; color:#fff; padding:2px 6px; border-radius:4px; min-width:24px; text-align:right; font-size:.8rem">@p.Cantidad</div>
+                        </div>
+                    </div>
+                }
             }
         </div>
 
@@ -113,6 +115,10 @@ else if (_data is not null)
     private bool _isLoading = true;
     private string? _error;
     private DashboardResponse? _data;
+
+    // Bar width as a percentage of the section max (min 6% so a tiny value is still visible).
+    private static int BarPct(int value, int max)
+        => max <= 0 ? 0 : Math.Max(6, (int)Math.Round(value * 100.0 / max));
 
     protected override async Task OnInitializedAsync()
     {
