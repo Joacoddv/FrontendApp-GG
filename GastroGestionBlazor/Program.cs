@@ -61,5 +61,6 @@ builder.Services.AddScoped<MenuService>();
 builder.Services.AddScoped<PedidoService>();
 builder.Services.AddScoped<StockService>();
 builder.Services.AddScoped<ProveedorService>();
+builder.Services.AddScoped<DashboardService>();
 
 await builder.Build().RunAsync();

@@ -1,0 +1,132 @@
+@page "/dashboard"
+@attribute [Authorize(Roles = "Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Dashboard
+@using GastroGestionBlazor.Contracts.Common
+@inject DashboardService DashboardService
+
+<PageTitle>Dashboard · GastroGestión</PageTitle>
+
+<h3>Dashboard</h3>
+<hr class="custom-line" />
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+
+@if (_isLoading)
+{
+    <p>Cargando&hellip;</p>
+}
+else if (_data is not null)
+{
+    <div class="d-flex gap-3 flex-wrap mb-4">
+        <div class="card" style="min-width:200px">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Pedidos</h6>
+                <div class="fs-3 fw-bold">@_data.TotalPedidos</div>
+            </div>
+        </div>
+        <div class="card" style="min-width:200px">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Monto total en pedidos</h6>
+                <div class="fs-3 fw-bold">@_data.MontoTotalPedidos.ToString("N2")</div>
+            </div>
+        </div>
+        <div class="card" style="min-width:200px">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Ingredientes en alerta</h6>
+                <div class="fs-3 fw-bold @(_data.AlertasStock.Count > 0 ? "text-danger" : "")">@_data.AlertasStock.Count</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-4 flex-wrap">
+        <div style="flex:1 1 280px">
+            <h5>Pedidos por estado</h5>
+            @if (_data.PedidosPorEstado.Count == 0)
+            {
+                <p class="text-muted">Sin pedidos.</p>
+            }
+            else
+            {
+                <table class="table">
+                    <thead><tr><th>Estado</th><th class="text-end">Cantidad</th></tr></thead>
+                    <tbody>
+                        @foreach (var e in _data.PedidosPorEstado)
+                        {
+                            <tr><td>@e.Estado</td><td class="text-end">@e.Cantidad</td></tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <div style="flex:1 1 280px">
+            <h5>Platos más pedidos</h5>
+            @if (_data.TopPlatos.Count == 0)
+            {
+                <p class="text-muted">Sin datos.</p>
+            }
+            else
+            {
+                <table class="table">
+                    <thead><tr><th>Plato</th><th class="text-end">Unidades</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in _data.TopPlatos)
+                        {
+                            <tr><td>@p.Plato</td><td class="text-end">@p.Cantidad</td></tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <div style="flex:1 1 280px">
+            <h5>Alertas de stock</h5>
+            @if (_data.AlertasStock.Count == 0)
+            {
+                <p class="text-muted">Sin alertas. </p>
+            }
+            else
+            {
+                <table class="table">
+                    <thead><tr><th>Ingrediente</th><th class="text-end">Balance</th><th class="text-end">Umbral</th></tr></thead>
+                    <tbody>
+                        @foreach (var a in _data.AlertasStock)
+                        {
+                            <tr>
+                                <td>@a.Ingrediente</td>
+                                <td class="text-end text-danger fw-bold">@a.Balance.ToString("N2")</td>
+                                <td class="text-end">@a.StockMinimo.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string? _error;
+    private DashboardResponse? _data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _data = await DashboardService.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

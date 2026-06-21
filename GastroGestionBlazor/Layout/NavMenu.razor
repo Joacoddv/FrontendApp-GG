@@ -11,6 +11,11 @@
         </div>
     </div>
     <ul class="nav flex-column">
+        <AuthorizeView Roles="Administrador">
+            <li class="nav-item">
+                <NavLink class="nav-link" href="dashboard"><i class="fas fa-chart-line"></i>Dashboard</NavLink>
+            </li>
+        </AuthorizeView>
         <li class="nav-item">
             <NavLink class="nav-link" href="clientes"><i class="fas fa-users"></i>Clientes</NavLink>
         </li>
