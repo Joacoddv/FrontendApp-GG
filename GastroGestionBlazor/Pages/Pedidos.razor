@@ -52,7 +52,7 @@ else
                 <th>Fecha</th>
                 <th>Tipo</th>
                 <th>Estado</th>
-                <th>Mesa</th>
+                <th>Mesa / Destino</th>
                 <th>Cliente</th>
                 <th class="text-end">Ítems</th>
                 <th class="text-end">Total</th>
@@ -66,7 +66,7 @@ else
                     <td>@p.CreadoEnUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
                     <td>@GetTipoLabel(p.Tipo)</td>
                     <td><span class="badge @EstadoBadge(p.Estado)">@p.Estado</span></td>
-                    <td>@MesaLabel(p.MesaId)</td>
+                    <td>@DestinoLabel(p)</td>
                     <td>@ClienteLabel(p.ClienteId)</td>
                     <td class="text-end">@p.Lineas.Sum(l => l.Cantidad)</td>
                     <td class="text-end">@FormatTotal(p)</td>
@@ -129,6 +129,14 @@ else
 
     private string MesaLabel(Guid? mesaId)
         => mesaId is { } id && _mesas.TryGetValue(id, out var label) ? label : "—";
+
+    // Salon -> table; Delivery -> destination city; otherwise nothing relevant.
+    private string DestinoLabel(PedidoResponse p) => p.Tipo switch
+    {
+        TipoPedido.Salon    => MesaLabel(p.MesaId),
+        TipoPedido.Delivery => p.DireccionEntrega is { } d ? $"🛵 {d.Ciudad}" : "—",
+        _                   => "—"
+    };
 
     private string ClienteLabel(Guid? clienteId)
         => clienteId is { } id && _clientes.TryGetValue(id, out var label) ? label : "—";
