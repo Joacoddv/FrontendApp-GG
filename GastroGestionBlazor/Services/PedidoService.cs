@@ -64,6 +64,21 @@ public sealed class PedidoService
             await ThrowApiExceptionAsync(response, "No se pudieron generar las órdenes de trabajo.", ct);
     }
 
+    /// <summary>GET /pedidos — lists orders (newest first), optionally filtered by estado.</summary>
+    public async Task<List<PedidoResponse>> GetPedidosAsync(string? estado = null, CancellationToken ct = default)
+    {
+        var url = string.IsNullOrWhiteSpace(estado)
+            ? "pedidos"
+            : $"pedidos?estado={Uri.EscapeDataString(estado)}";
+
+        var response = await _httpClient.GetAsync(url, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo cargar la lista de pedidos.", ct);
+
+        var result = await response.Content.ReadFromJsonAsync<List<PedidoResponse>>(JsonOptions, ct);
+        return result ?? new List<PedidoResponse>();
+    }
+
     /// <summary>GET /mesas — active tables for the Salon picker.</summary>
     public async Task<List<MesaResponse>> GetMesasAsync(CancellationToken ct = default)
     {
