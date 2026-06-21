@@ -1,0 +1,291 @@
+@page "/pedidos/nuevo"
+@attribute [Authorize(Roles = "Mozo,Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Mesas
+@using GastroGestionBlazor.Contracts.Clientes
+@using GastroGestionBlazor.Contracts.Platos
+@using GastroGestionBlazor.Contracts.Pedidos
+@using GastroGestionBlazor.Contracts.Common
+@inject PedidoService PedidoService
+@inject PlatoService PlatoService
+@inject ClienteService ClienteService
+@inject NavigationManager Navigation
+
+<PageTitle>Nuevo pedido · GastroGestión</PageTitle>
+
+<div class="page-head">
+    <span class="eyebrow">El salón</span>
+    <h3>Nuevo pedido</h3>
+</div>
+
+@if (_isLoading)
+{
+    <p class="text-muted">Cargando&hellip;</p>
+}
+else if (_success is not null)
+{
+    <div class="alert alert-success" role="alert">
+        Pedido creado y enviado a cocina (@_success.Lineas línea@(_success.Lineas == 1 ? "" : "s")).
+    </div>
+    <button class="btn btn-primary" @onclick="VerTablero"><i class="fas fa-fire-burner"></i> Ver el tablero de cocina</button>
+    <button class="btn btn-secondary ms-2" @onclick="NuevoPedido">Cargar otro pedido</button>
+    <button class="btn btn-outline-secondary ms-2" @onclick="VerPedidos">Ver pedidos</button>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+
+    <div class="detail-container">
+        <div class="detail-item">
+            <label>Tipo de pedido <span class="text-danger">*</span></label>
+            <select @bind="_tipo" class="form-select">
+                @foreach (var t in Enum.GetValues<TipoPedido>())
+                {
+                    <option value="@t">@GetTipoLabel(t)</option>
+                }
+            </select>
+        </div>
+
+        <div class="detail-item">
+            <label>Cliente</label>
+            <select @bind="_clienteId" class="form-select">
+                <option value="">— Sin cliente —</option>
+                @foreach (var c in _clientes)
+                {
+                    <option value="@c.Id">@c.Nombre</option>
+                }
+            </select>
+        </div>
+
+        @if (_tipo == TipoPedido.Salon)
+        {
+            <div class="detail-item">
+                <label>Mesa <span class="text-danger">*</span></label>
+                <select @bind="_mesaId" class="form-select">
+                    <option value="">— Seleccionar mesa —</option>
+                    @foreach (var m in _mesas)
+                    {
+                        <option value="@m.Id">Mesa @m.Numero (cap. @m.Capacidad)</option>
+                    }
+                </select>
+                @if (_mesas.Count == 0)
+                {
+                    <small class="text-muted">No hay mesas disponibles.</small>
+                }
+            </div>
+        }
+        else if (_tipo == TipoPedido.Delivery)
+        {
+            <div class="detail-item"><label>Calle <span class="text-danger">*</span></label><input @bind="_dir.Calle" class="form-control" /></div>
+            <div class="detail-item"><label>Número <span class="text-danger">*</span></label><input @bind="_dir.Numero" class="form-control" /></div>
+            <div class="detail-item"><label>Ciudad <span class="text-danger">*</span></label><input @bind="_dir.Ciudad" class="form-control" /></div>
+            <div class="detail-item"><label>Provincia <span class="text-danger">*</span></label><input @bind="_dir.Provincia" class="form-control" /></div>
+            <div class="detail-item"><label>Código postal <span class="text-danger">*</span></label><input @bind="_dir.CodigoPostal" class="form-control" /></div>
+            <div class="detail-item"><label>Piso</label><input @bind="_dir.Piso" class="form-control" /></div>
+            <div class="detail-item"><label>Departamento</label><input @bind="_dir.Departamento" class="form-control" /></div>
+        }
+
+        <div style="flex-basis:100%">
+            <label>Platos del pedido <span class="text-danger">*</span></label>
+            @if (_lineas.Count == 0)
+            {
+                <p class="text-muted small mb-2">Agregá al menos un plato.</p>
+            }
+            @foreach (var linea in _lineas)
+            {
+                <div class="d-flex gap-2 mb-2 align-items-end">
+                    <div style="flex:1 1 auto">
+                        <select @bind="linea.PlatoId" class="form-select">
+                            <option value="@Guid.Empty">— Plato —</option>
+                            @foreach (var p in _platos)
+                            {
+                                <option value="@p.Id">@p.Nombre (@p.PrecioBase.ToString("N2") @p.Moneda)</option>
+                            }
+                        </select>
+                    </div>
+                    <div style="width:110px">
+                        <input type="number" min="1" step="1" @bind="linea.Cantidad" class="form-control" placeholder="Cant." />
+                    </div>
+                    <div style="flex:1 1 auto">
+                        <input @bind="linea.Observaciones" class="form-control" placeholder="Observaciones (opcional)" />
+                    </div>
+                    <button class="btn btn-danger" @onclick="() => QuitarLinea(linea)" title="Quitar"><i class="fas fa-trash"></i></button>
+                </div>
+            }
+            <button class="btn btn-secondary btn-sm" @onclick="AgregarLinea"><i class="fas fa-plus"></i> Agregar plato</button>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" @onclick="GuardarPedido" disabled="@_isSaving">
+                @(_isSaving ? "Procesando..." : "Crear pedido y generar órdenes")
+            </button>
+        </div>
+    </div>
+    <div class="footer-spacing"></div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _error;
+    private SuccessInfo? _success;
+
+    private List<MesaResponse> _mesas = new();
+    private List<PlatoResponse> _platos = new();
+    private List<ClienteResponse> _clientes = new();
+
+    private TipoPedido _tipo = TipoPedido.Salon;
+    private Guid? _mesaId;
+    private Guid? _clienteId;
+    private readonly DireccionModel _dir = new();
+    private readonly List<LineaModel> _lineas = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _platos = (await PlatoService.GetAllAsync()).Where(p => p.Activo).ToList();
+            _mesas = (await PedidoService.GetMesasAsync()).Where(m => m.Activa).ToList();
+            _clientes = (await ClienteService.GetAllAsync()).Where(c => c.Activo).ToList();
+            _lineas.Add(new LineaModel());
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void AgregarLinea() => _lineas.Add(new LineaModel());
+    private void QuitarLinea(LineaModel linea) => _lineas.Remove(linea);
+
+    private async Task GuardarPedido()
+    {
+        _error = null;
+
+        if (_tipo == TipoPedido.Salon && (_mesaId is null || _mesaId == Guid.Empty))
+        {
+            _error = "Seleccioná una mesa para un pedido de salón.";
+            return;
+        }
+        if (_tipo == TipoPedido.Delivery && !_dir.IsComplete())
+        {
+            _error = "Completá la dirección de entrega (calle, número, ciudad, provincia y código postal).";
+            return;
+        }
+        var lineasValidas = _lineas.Where(l => l.PlatoId != Guid.Empty).ToList();
+        if (lineasValidas.Count == 0)
+        {
+            _error = "Agregá al menos un plato al pedido.";
+            return;
+        }
+        if (lineasValidas.Any(l => l.Cantidad <= 0))
+        {
+            _error = "La cantidad de cada plato debe ser mayor a cero.";
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var request = new CrearPedidoRequest(
+                _tipo,
+                _tipo == TipoPedido.Salon ? _mesaId : null,
+                ClienteId: _clienteId == Guid.Empty ? null : _clienteId,
+                _tipo == TipoPedido.Delivery ? _dir.ToRequest() : null);
+
+            var pedidoId = await PedidoService.CrearPedidoAsync(request);
+
+            // Each line must carry a confirmed price snapshot before OTs can be generated.
+            foreach (var l in lineasValidas)
+            {
+                var lineaId = await PedidoService.AgregarLineaAsync(
+                    pedidoId, new AgregarLineaRequest(l.PlatoId, l.Cantidad,
+                        string.IsNullOrWhiteSpace(l.Observaciones) ? null : l.Observaciones.Trim()));
+                await PedidoService.ConfirmarPrecioLineaAsync(pedidoId, lineaId);
+            }
+
+            await PedidoService.GenerarOrdenesTrabajoAsync(pedidoId);
+
+            _success = new SuccessInfo(lineasValidas.Count);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void NuevoPedido()
+    {
+        _success = null;
+        _error = null;
+        _tipo = TipoPedido.Salon;
+        _mesaId = null;
+        _clienteId = null;
+        _dir.Reset();
+        _lineas.Clear();
+        _lineas.Add(new LineaModel());
+    }
+
+    private void VerTablero() => Navigation.NavigateTo("/ordenes-trabajo");
+    private void VerPedidos() => Navigation.NavigateTo("/pedidos");
+
+    private static string GetTipoLabel(TipoPedido t) => t switch
+    {
+        TipoPedido.Salon    => "Salón",
+        TipoPedido.TakeAway => "TakeAway",
+        TipoPedido.Delivery => "Delivery",
+        _                   => t.ToString()
+    };
+
+    private sealed record SuccessInfo(int Lineas);
+
+    private sealed class LineaModel
+    {
+        public Guid PlatoId { get; set; } = Guid.Empty;
+        public int Cantidad { get; set; } = 1;
+        public string? Observaciones { get; set; }
+    }
+
+    private sealed class DireccionModel
+    {
+        public string Calle { get; set; } = "";
+        public string Numero { get; set; } = "";
+        public string Ciudad { get; set; } = "";
+        public string Provincia { get; set; } = "";
+        public string CodigoPostal { get; set; } = "";
+        public string? Piso { get; set; }
+        public string? Departamento { get; set; }
+
+        public bool IsComplete() =>
+            !string.IsNullOrWhiteSpace(Calle) && !string.IsNullOrWhiteSpace(Numero) &&
+            !string.IsNullOrWhiteSpace(Ciudad) && !string.IsNullOrWhiteSpace(Provincia) &&
+            !string.IsNullOrWhiteSpace(CodigoPostal);
+
+        public DireccionEntregaRequest ToRequest() =>
+            new(Calle.Trim(), Numero.Trim(), Ciudad.Trim(), Provincia.Trim(), CodigoPostal.Trim(),
+                string.IsNullOrWhiteSpace(Piso) ? null : Piso!.Trim(),
+                string.IsNullOrWhiteSpace(Departamento) ? null : Departamento!.Trim());
+
+        public void Reset()
+        {
+            Calle = Numero = Ciudad = Provincia = CodigoPostal = "";
+            Piso = Departamento = null;
+        }
+    }
+}
