@@ -1,4 +1,5 @@
 using GastroGestionBlazor.Contracts.Common;
+using GastroGestionBlazor.Contracts.Enums;
 using GastroGestionBlazor.Contracts.Mesas;
 using GastroGestionBlazor.Contracts.Pedidos;
 using System.Net.Http.Json;
@@ -87,6 +88,21 @@ public sealed class PedidoService
             return null;
         if (!response.IsSuccessStatusCode)
             await ThrowApiExceptionAsync(response, "No se pudo cargar el pedido.", ct);
+
+        return await response.Content.ReadFromJsonAsync<PedidoResponse>(JsonOptions, ct);
+    }
+
+    /// <summary>
+    /// POST /pedidos/{id}/transicion — moves the order to a new state and returns the updated order.
+    /// The backend re-validates the transition against the state machine and the caller's role.
+    /// </summary>
+    public async Task<PedidoResponse?> TransicionarEstadoAsync(
+        Guid id, EstadoPedido estadoNuevo, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"pedidos/{id}/transicion", new TransicionarEstadoRequest(estadoNuevo), JsonOptions, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo cambiar el estado del pedido.", ct);
 
         return await response.Content.ReadFromJsonAsync<PedidoResponse>(JsonOptions, ct);
     }

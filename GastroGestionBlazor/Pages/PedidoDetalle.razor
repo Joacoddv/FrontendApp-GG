@@ -1,13 +1,18 @@
 @page "/pedidos/{Id:guid}"
-@attribute [Authorize(Roles = "Mozo,Administrador")]
+@attribute [Authorize(Roles = "Mozo,Cajero,Administrador")]
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @using GastroGestionBlazor.Contracts.Enums
 @using GastroGestionBlazor.Contracts.Platos
 @using GastroGestionBlazor.Contracts.Pedidos
+@using GastroGestionBlazor.Contracts.Common
 @inject PedidoService PedidoService
 @inject PlatoService PlatoService
 @inject ClienteService ClienteService
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthProvider
+@inject IJSRuntime JS
 
 <PageTitle>Detalle de pedido · GastroGestión</PageTitle>
 
@@ -93,6 +98,24 @@ else
             </tfoot>
         </table>
     }
+
+    @if (Permitidas.Count > 0)
+    {
+        <h5 class="mt-4">Cambiar estado</h5>
+        @if (!string.IsNullOrEmpty(_transError))
+        {
+            <div class="alert alert-danger" role="alert">@_transError</div>
+        }
+        <div class="d-flex gap-2 flex-wrap">
+            @foreach (var destino in Permitidas)
+            {
+                <button class="btn @BtnClass(destino)" disabled="@_transitioning"
+                        @onclick="() => Transicionar(destino)">
+                    @TransicionLabel(destino)
+                </button>
+            }
+        </div>
+    }
 }
 
 @code {
@@ -102,14 +125,29 @@ else
     private string? _error;
     private PedidoResponse? _pedido;
 
+    private string? _rol;
+    private string? _transError;
+    private bool _transitioning;
+
     private Dictionary<Guid, string> _platos = new();
     private Dictionary<Guid, string> _mesas = new();
     private Dictionary<Guid, string> _clientes = new();
+
+    private EstadoPedido? _estadoActual =>
+        _pedido is not null && Enum.TryParse<EstadoPedido>(_pedido.Estado, out var e) ? e : null;
+
+    private IReadOnlyList<EstadoPedido> Permitidas =>
+        _pedido is not null && _estadoActual is { } actual
+            ? PedidoTransiciones.Permitidas(_pedido.Tipo, actual, _rol)
+            : Array.Empty<EstadoPedido>();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            _rol = authState.User.FindFirst(ClaimTypes.Role)?.Value;
+
             _platos = (await PlatoService.GetAllAsync()).ToDictionary(p => p.Id, p => p.Nombre);
             _mesas = (await PedidoService.GetMesasAsync()).ToDictionary(m => m.Id, m => $"Mesa {m.Numero}");
             _clientes = (await ClienteService.GetAllAsync()).ToDictionary(c => c.Id, c => c.Nombre);
@@ -126,6 +164,52 @@ else
     }
 
     private void Volver() => Navigation.NavigateTo("/pedidos");
+
+    private async Task Transicionar(EstadoPedido destino)
+    {
+        _transError = null;
+
+        if (destino == EstadoPedido.Cancelado)
+        {
+            var ok = await JS.InvokeAsync<bool>("confirm", "¿Cancelar este pedido? No se puede deshacer.");
+            if (!ok)
+                return;
+        }
+
+        _transitioning = true;
+        try
+        {
+            var updated = await PedidoService.TransicionarEstadoAsync(_pedido!.Id, destino);
+            if (updated is not null)
+                _pedido = updated;
+        }
+        catch (ApiException ex)
+        {
+            _transError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _transError = ex.Message;
+        }
+        finally
+        {
+            _transitioning = false;
+        }
+    }
+
+    private static string TransicionLabel(EstadoPedido destino) => destino switch
+    {
+        EstadoPedido.Cerrado           => "Cerrar pedido",
+        EstadoPedido.Cancelado         => "Cancelar",
+        EstadoPedido.Modificado        => "Marcar modificado",
+        EstadoPedido.Preparandose      => "Enviar a preparación",
+        EstadoPedido.ListoParaEntregar => "Marcar listo",
+        EstadoPedido.Entregado         => "Marcar entregado",
+        _                              => destino.ToString()
+    };
+
+    private static string BtnClass(EstadoPedido destino)
+        => destino == EstadoPedido.Cancelado ? "btn-danger" : "btn-primary";
 
     private string PlatoLabel(Guid platoId)
         => _platos.TryGetValue(platoId, out var n) ? n : "(plato)";
