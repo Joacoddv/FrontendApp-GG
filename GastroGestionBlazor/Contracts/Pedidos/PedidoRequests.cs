@@ -29,3 +29,6 @@ public sealed record AgregarLineaRequest(
 
 /// <summary>Request body for POST /pedidos/{id}/transicion.</summary>
 public sealed record TransicionarEstadoRequest(EstadoPedido EstadoNuevo);
+
+/// <summary>Request body for PUT /pedidos/{id}/lineas/{lineaId} — edit quantity/notes.</summary>
+public sealed record ActualizarLineaRequest(int Cantidad, string? Observaciones);
