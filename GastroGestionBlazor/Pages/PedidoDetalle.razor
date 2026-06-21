@@ -112,6 +112,10 @@ else
                                 @if (_puedeEditarLineas && _editId is null)
                                 {
                                     <button class="btn btn-warning btn-sm" @onclick="() => IniciarEdicion(l)" title="Editar línea"><i class="fas fa-edit"></i></button>
+                                    @if (_pedido.Lineas.Count > 1)
+                                    {
+                                        <button class="btn btn-danger btn-sm" disabled="@_savingLinea" @onclick="() => QuitarLinea(l)" title="Quitar línea"><i class="fas fa-trash"></i></button>
+                                    }
                                 }
                             </td>
                         }
@@ -127,6 +131,37 @@ else
                 </tr>
             </tfoot>
         </table>
+    }
+
+    @if (_puedeEditarLineas)
+    {
+        <div class="d-flex gap-2 flex-wrap align-items-end mt-2 mb-2" style="max-width:760px">
+            <div style="flex:1 1 auto; min-width:200px">
+                <label class="form-label mb-1">Agregar plato</label>
+                <select @bind="_addPlatoId" class="form-select form-select-sm">
+                    <option value="@Guid.Empty">— Plato —</option>
+                    @foreach (var p in _platosActivos)
+                    {
+                        <option value="@p.Id">@p.Nombre (@p.PrecioBase.ToString("N2") @p.Moneda)</option>
+                    }
+                </select>
+            </div>
+            <div style="width:90px">
+                <label class="form-label mb-1">Cant.</label>
+                <input type="number" min="1" step="1" @bind="_addCant" class="form-control form-control-sm" />
+            </div>
+            <div style="flex:1 1 auto; min-width:160px">
+                <label class="form-label mb-1">Observaciones</label>
+                <input @bind="_addObs" class="form-control form-control-sm" placeholder="Opcional" />
+            </div>
+            <button class="btn btn-primary btn-sm" disabled="@_adding" @onclick="AgregarPlato">
+                <i class="fas fa-plus"></i> @(_adding ? "Agregando..." : "Agregar")
+            </button>
+        </div>
+        @if (!string.IsNullOrEmpty(_addError))
+        {
+            <div class="alert alert-danger" role="alert">@_addError</div>
+        }
     }
 
     @if (Permitidas.Count > 0)
@@ -165,6 +200,13 @@ else
     private string? _lineaError;
     private bool _savingLinea;
 
+    private List<PlatoResponse> _platosActivos = new();
+    private Guid _addPlatoId = Guid.Empty;
+    private int _addCant = 1;
+    private string? _addObs;
+    private string? _addError;
+    private bool _adding;
+
     private Dictionary<Guid, string> _platos = new();
     private Dictionary<Guid, string> _mesas = new();
     private Dictionary<Guid, string> _clientes = new();
@@ -189,7 +231,9 @@ else
             var authState = await AuthProvider.GetAuthenticationStateAsync();
             _rol = authState.User.FindFirst(ClaimTypes.Role)?.Value;
 
-            _platos = (await PlatoService.GetAllAsync()).ToDictionary(p => p.Id, p => p.Nombre);
+            var platos = await PlatoService.GetAllAsync();
+            _platos = platos.ToDictionary(p => p.Id, p => p.Nombre);
+            _platosActivos = platos.Where(p => p.Activo).ToList();
             _mesas = (await PedidoService.GetMesasAsync()).ToDictionary(m => m.Id, m => $"Mesa {m.Numero}");
             _clientes = (await ClienteService.GetAllAsync()).ToDictionary(c => c.Id, c => c.Nombre);
             _pedido = await PedidoService.GetPedidoByIdAsync(Id);
@@ -218,6 +262,79 @@ else
     {
         _editId = null;
         _lineaError = null;
+    }
+
+    private async Task QuitarLinea(LineaPedidoResponse l)
+    {
+        _lineaError = null;
+        var ok = await JS.InvokeAsync<bool>("confirm", "¿Quitar esta línea del pedido?");
+        if (!ok)
+            return;
+
+        _savingLinea = true;
+        try
+        {
+            var updated = await PedidoService.QuitarLineaAsync(_pedido!.Id, l.Id);
+            if (updated is not null)
+                _pedido = updated;
+        }
+        catch (ApiException ex)
+        {
+            _lineaError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _lineaError = ex.Message;
+        }
+        finally
+        {
+            _savingLinea = false;
+        }
+    }
+
+    private async Task AgregarPlato()
+    {
+        _addError = null;
+        if (_addPlatoId == Guid.Empty)
+        {
+            _addError = "Elegí un plato.";
+            return;
+        }
+        if (_addCant <= 0)
+        {
+            _addError = "La cantidad debe ser mayor a cero.";
+            return;
+        }
+
+        _adding = true;
+        try
+        {
+            // Add the line, confirm its price snapshot, then route it to the kitchen with its own OT.
+            var lineaId = await PedidoService.AgregarLineaAsync(
+                _pedido!.Id,
+                new AgregarLineaRequest(_addPlatoId, _addCant,
+                    string.IsNullOrWhiteSpace(_addObs) ? null : _addObs!.Trim()));
+            await PedidoService.ConfirmarPrecioLineaAsync(_pedido.Id, lineaId);
+            var updated = await PedidoService.GenerarOrdenTrabajoLineaAsync(_pedido.Id, lineaId);
+            if (updated is not null)
+                _pedido = updated;
+
+            _addPlatoId = Guid.Empty;
+            _addCant = 1;
+            _addObs = null;
+        }
+        catch (ApiException ex)
+        {
+            _addError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _addError = ex.Message;
+        }
+        finally
+        {
+            _adding = false;
+        }
     }
 
     private async Task GuardarLinea(LineaPedidoResponse l)
