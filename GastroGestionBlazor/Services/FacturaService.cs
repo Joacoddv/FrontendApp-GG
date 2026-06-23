@@ -90,6 +90,26 @@ public sealed class FacturaService
             await ThrowApiExceptionAsync(response, "No se pudo anular la factura.", ct);
     }
 
+    /// <summary>GET /facturas/reporte — aggregated sales figures over an optional date range.</summary>
+    public async Task<ReporteVentasResponse> GetReporteVentasAsync(
+        DateTime? desde = null, DateTime? hasta = null, CancellationToken ct = default)
+    {
+        var qs = new List<string>();
+        if (desde.HasValue)
+            qs.Add($"desde={Uri.EscapeDataString(desde.Value.Date.ToString("yyyy-MM-ddTHH:mm:ss"))}");
+        if (hasta.HasValue)
+            // End of the selected day so the range is inclusive.
+            qs.Add($"hasta={Uri.EscapeDataString(hasta.Value.Date.AddDays(1).AddSeconds(-1).ToString("yyyy-MM-ddTHH:mm:ss"))}");
+
+        var url = "facturas/reporte" + (qs.Count > 0 ? "?" + string.Join("&", qs) : "");
+
+        var response = await _httpClient.GetAsync(url, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo generar el reporte.", ct);
+
+        return (await response.Content.ReadFromJsonAsync<ReporteVentasResponse>(JsonOptions, ct))!;
+    }
+
     // POST returns the new Guid in the body; fall back to the Location header.
     private static async Task<Guid> ReadIdAsync(HttpResponseMessage response, CancellationToken ct)
     {

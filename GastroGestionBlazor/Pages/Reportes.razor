@@ -1,0 +1,138 @@
+@page "/reportes"
+@attribute [Authorize(Roles = "Cajero,Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Facturacion
+@using GastroGestionBlazor.Contracts.Common
+@inject FacturaService FacturaService
+
+<PageTitle>Reportes de ventas · GastroGestión</PageTitle>
+
+<div class="page-head">
+    <span class="eyebrow">Facturación</span>
+    <h3>Reportes de ventas</h3>
+</div>
+
+<div class="search-container">
+    <div class="form-group">
+        <label>Desde</label>
+        <input type="date" class="form-control" @bind="_desde" />
+    </div>
+    <div class="form-group">
+        <label>Hasta</label>
+        <input type="date" class="form-control" @bind="_hasta" />
+    </div>
+    <div class="form-group" style="align-self:flex-end">
+        <button class="btn btn-primary" disabled="@_isLoading" @onclick="Generar">
+            @(_isLoading ? "Generando..." : "Generar")
+        </button>
+    </div>
+</div>
+<p class="text-muted small">Excluye facturas canceladas y anuladas. Sin fechas = todo el historial.</p>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+
+@if (_isLoading)
+{
+    <p>Cargando&hellip;</p>
+}
+else if (_reporte is not null)
+{
+    <div class="detail-container">
+        <div class="detail-item"><label>Facturas</label><div><strong>@_reporte.CantidadFacturas</strong></div></div>
+        <div class="detail-item"><label>Total facturado</label><div><strong>@Money(_reporte.TotalFacturado)</strong></div></div>
+        <div class="detail-item"><label>Total cobrado</label><div><strong>@Money(_reporte.TotalCobrado)</strong></div></div>
+    </div>
+
+    <h5 class="mt-4">Por tipo de comprobante</h5>
+    @if (_reporte.PorTipo.Count == 0)
+    {
+        <p class="text-muted">Sin datos.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>Tipo</th><th class="text-end">Cantidad</th><th class="text-end">Total</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var t in _reporte.PorTipo)
+                {
+                    <tr>
+                        <td>@GetTipoLabel(t.Tipo)</td>
+                        <td class="text-end">@t.Cantidad</td>
+                        <td class="text-end">@Money(t.Total)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <h5 class="mt-4">Por método de pago</h5>
+    @if (_reporte.PorMetodoPago.Count == 0)
+    {
+        <p class="text-muted">Sin pagos registrados.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>Método</th><th class="text-end">Total</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var m in _reporte.PorMetodoPago)
+                {
+                    <tr>
+                        <td>@m.Metodo</td>
+                        <td class="text-end">@Money(m.Total)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private DateTime? _desde;
+    private DateTime? _hasta;
+    private bool _isLoading;
+    private string? _error;
+    private ReporteVentasResponse? _reporte;
+
+    protected override Task OnInitializedAsync() => Generar();
+
+    private async Task Generar()
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            _reporte = await FacturaService.GetReporteVentasAsync(_desde, _hasta);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string Money(decimal monto) => $"${monto:N2}";
+
+    private static string GetTipoLabel(TipoComprobante t) => t switch
+    {
+        TipoComprobante.TicketInterno      => "Ticket",
+        TipoComprobante.FacturaConIVA      => "Factura c/IVA",
+        TipoComprobante.FacturaElectronica => "Factura Elec.",
+        _                                  => t.ToString()
+    };
+}
