@@ -71,11 +71,15 @@ else
                 <div class="form-group">
                     <label>Tipo de comprobante</label>
                     <select class="form-select" @bind="_tipo">
-                        @foreach (TipoComprobanteSolicitado t in Enum.GetValues(typeof(TipoComprobanteSolicitado)))
+                        @foreach (var t in TiposPermitidos)
                         {
                             <option value="@t">@GetTipoSolicitadoLabel(t)</option>
                         }
                     </select>
+                    @if (ClienteSeleccionado?.CondicionIVA == CondicionIVA.ConsumidorFinal)
+                    {
+                        <small class="text-muted">Un Consumidor Final solo puede recibir un ticket.</small>
+                    }
                 </div>
             </div>
 
@@ -138,6 +142,15 @@ else
     private List<PedidoResponse> _pedidosBillables = new();
     private HashSet<Guid> _pedidosSeleccionados = new();
 
+    private ClienteResponse? ClienteSeleccionado
+        => _clienteId != Guid.Empty ? _clientes.FirstOrDefault(c => c.Id == _clienteId) : null;
+
+    // Mirrors backend ReglasComprobante: a ConsumidorFinal may only receive a ticket.
+    private IReadOnlyList<TipoComprobanteSolicitado> TiposPermitidos
+        => ClienteSeleccionado?.CondicionIVA == CondicionIVA.ConsumidorFinal
+            ? new[] { TipoComprobanteSolicitado.TicketInterno }
+            : Enum.GetValues<TipoComprobanteSolicitado>();
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -164,6 +177,11 @@ else
     {
         _pedidosBillables = GetBillablePedidos().ToList();
         _pedidosSeleccionados.Clear();
+
+        // Keep the selected comprobante type valid for this client's fiscal condition.
+        if (!TiposPermitidos.Contains(_tipo))
+            _tipo = TiposPermitidos[0];
+
         return Task.CompletedTask;
     }
 
