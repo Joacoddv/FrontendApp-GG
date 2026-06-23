@@ -129,6 +129,9 @@ else
 }
 
 @code {
+    // Optional deep-link from a pedido: pre-selects the client and checks the pedido.
+    [Parameter, SupplyParameterFromQuery] public Guid? PedidoId { get; set; }
+
     private bool _isLoading = true;
     private bool _isSaving;
     private string? _error;
@@ -158,6 +161,19 @@ else
             var allClientes = await ClienteService.GetAllAsync();
             _clientes = allClientes.Where(c => c.Activo).ToList();
             _allPedidos = await PedidoService.GetPedidosAsync();
+
+            // Deep-link: if arriving from a pedido, pre-select its client and check it.
+            if (PedidoId is { } pid)
+            {
+                var pedido = _allPedidos.FirstOrDefault(p => p.Id == pid);
+                if (pedido?.ClienteId is { } cid)
+                {
+                    _clienteId = cid;
+                    await OnClienteChanged();
+                    if (_pedidosBillables.Any(p => p.Id == pid))
+                        _pedidosSeleccionados.Add(pid);
+                }
+            }
         }
         catch (ApiException ex)
         {

@@ -69,6 +69,17 @@ else
         }
     </div>
 
+    @if (PuedeFacturar)
+    {
+        <AuthorizeView Roles="Cajero,Administrador">
+            <div class="form-row mt-2">
+                <button class="btn btn-outline-primary" @onclick="Facturar">
+                    <i class="fas fa-file-invoice-dollar"></i> Facturar este pedido
+                </button>
+            </div>
+        </AuthorizeView>
+    }
+
     <h5 class="mt-4">Platos</h5>
     @if (!string.IsNullOrEmpty(_lineaError))
     {
@@ -262,6 +273,16 @@ else
     }
 
     private void Volver() => Navigation.NavigateTo("/pedidos");
+
+    // A pedido can be billed when it has a client, isn't cancelled, and has at least
+    // one priced line (matches the backend's billable-line rule).
+    private bool PuedeFacturar
+        => _pedido is { ClienteId: not null } p
+           && p.Estado != "Cancelado"
+           && p.Lineas.Any(l => l.PrecioUnitario is not null && l.IvaTasa is not null);
+
+    private void Facturar()
+        => Navigation.NavigateTo($"/facturas/crear?pedidoId={_pedido!.Id}");
 
     private void IniciarEdicion(LineaPedidoResponse l)
     {
