@@ -935,3 +935,25 @@ label, .form-group label {
         top: 0.6rem;
         color: var(--wall-dim);
     }
+
+/* ============================================================
+   Print layout. Drops the app chrome (sidebar) and anything
+   marked .no-print so a detail view (e.g. a factura) prints as
+   a clean document — "Save as PDF" from the browser dialog.
+   ============================================================ */
+@media print {
+    .sidebar,
+    .no-print,
+    #blazor-error-ui {
+        display: none !important;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        padding: 0 !important;
+    }
+
+    body {
+        background: #fff !important;
+    }
+}
