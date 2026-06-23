@@ -1,0 +1,234 @@
+@page "/facturas/crear"
+@attribute [Authorize(Roles = "Cajero,Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Clientes
+@using GastroGestionBlazor.Contracts.Pedidos
+@using GastroGestionBlazor.Contracts.Facturacion
+@using GastroGestionBlazor.Contracts.Common
+@inject FacturaService FacturaService
+@inject PedidoService PedidoService
+@inject ClienteService ClienteService
+@inject NavigationManager Navigation
+
+<PageTitle>Nueva factura · GastroGestión</PageTitle>
+
+<h3>Nueva factura</h3>
+<hr class="custom-line" />
+
+<div class="form-row">
+    <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/facturas")'>
+        <i class="fas fa-arrow-left"></i> Volver
+    </button>
+</div>
+
+@if (_createdId != Guid.Empty)
+{
+    <div class="alert alert-success" role="alert">
+        <strong>Factura creada correctamente.</strong>
+        <div class="mt-2 d-flex gap-2">
+            <button class="btn btn-primary btn-sm" @onclick='() => Navigation.NavigateTo($"/facturas/{_createdId}")'>
+                <i class="fas fa-eye"></i> Ver factura
+            </button>
+            <button class="btn btn-secondary btn-sm" @onclick="ResetForm">
+                <i class="fas fa-plus"></i> Crear otra
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Navigation.NavigateTo("/facturas")'>
+                Ver listado
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    @if (_isLoading)
+    {
+        <p>Cargando&hellip;</p>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+
+        <div class="search-container">
+            <div class="form-group">
+                <label>Cliente</label>
+                <select class="form-select" @bind="_clienteId" @bind:after="OnClienteChanged">
+                    <option value="@Guid.Empty">— Seleccionar cliente —</option>
+                    @foreach (var c in _clientes)
+                    {
+                        <option value="@c.Id">@c.Nombre</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (_clienteId != Guid.Empty)
+        {
+            <div class="search-container mt-3">
+                <div class="form-group">
+                    <label>Tipo de comprobante</label>
+                    <select class="form-select" @bind="_tipo">
+                        @foreach (TipoComprobanteSolicitado t in Enum.GetValues(typeof(TipoComprobanteSolicitado)))
+                        {
+                            <option value="@t">@GetTipoSolicitadoLabel(t)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <h5 class="mt-4">Pedidos a facturar</h5>
+            @if (_pedidosBillables.Count == 0)
+            {
+                <p class="text-muted">No hay pedidos facturables para este cliente.</p>
+            }
+            else
+            {
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px"></th>
+                            <th>Fecha</th>
+                            <th class="text-end">Líneas</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in _pedidosBillables)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox"
+                                           checked="@_pedidosSeleccionados.Contains(p.Id)"
+                                           @onchange="() => TogglePedido(p.Id)" />
+                                </td>
+                                <td>@p.CreadoEnUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="text-end">@p.Lineas.Count</td>
+                                <td class="text-end">@FormatPedidoTotal(p)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <div class="form-row mt-3">
+                <button class="btn btn-primary"
+                        disabled="@(_isSaving || _pedidosSeleccionados.Count == 0)"
+                        @onclick="CrearFactura">
+                    @(_isSaving ? "Creando..." : "Crear factura")
+                </button>
+            </div>
+        }
+    }
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _error;
+    private Guid _createdId = Guid.Empty;
+
+    private Guid _clienteId = Guid.Empty;
+    private TipoComprobanteSolicitado _tipo = TipoComprobanteSolicitado.FacturaConIVA;
+
+    private List<ClienteResponse> _clientes = new();
+    private List<PedidoResponse> _allPedidos = new();
+    private List<PedidoResponse> _pedidosBillables = new();
+    private HashSet<Guid> _pedidosSeleccionados = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var allClientes = await ClienteService.GetAllAsync();
+            _clientes = allClientes.Where(c => c.Activo).ToList();
+            _allPedidos = await PedidoService.GetPedidosAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private Task OnClienteChanged()
+    {
+        _pedidosBillables = GetBillablePedidos().ToList();
+        _pedidosSeleccionados.Clear();
+        return Task.CompletedTask;
+    }
+
+    private void TogglePedido(Guid id)
+    {
+        if (!_pedidosSeleccionados.Remove(id))
+            _pedidosSeleccionados.Add(id);
+    }
+
+    private async Task CrearFactura()
+    {
+        _error = null;
+        _isSaving = true;
+        try
+        {
+            var request = new CrearFacturaRequest(
+                _clienteId,
+                _pedidosSeleccionados.ToArray(),
+                _tipo);
+
+            _createdId = await FacturaService.CrearFacturaAsync(request);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        _createdId = Guid.Empty;
+        _clienteId = Guid.Empty;
+        _tipo = TipoComprobanteSolicitado.FacturaConIVA;
+        _pedidosBillables.Clear();
+        _pedidosSeleccionados.Clear();
+        _error = null;
+    }
+
+    private IEnumerable<PedidoResponse> GetBillablePedidos() =>
+        _allPedidos
+            .Where(p => p.ClienteId == _clienteId
+                && p.Estado != "Cancelado"
+                && p.Lineas.Any(l => l.PrecioUnitario != null && l.IvaTasa != null))
+            .OrderByDescending(p => p.CreadoEnUtc);
+
+    private static string FormatPedidoTotal(PedidoResponse p)
+    {
+        var total = p.Lineas.Sum(l => l.TotalLinea ?? 0m);
+        var moneda = p.Lineas.FirstOrDefault(l => l.Moneda is not null)?.Moneda ?? "";
+        return total == 0m ? "—" : $"{total:N2} {moneda}".Trim();
+    }
+
+    private static string GetTipoSolicitadoLabel(TipoComprobanteSolicitado t) => t switch
+    {
+        TipoComprobanteSolicitado.TicketInterno      => "Ticket",
+        TipoComprobanteSolicitado.FacturaConIVA      => "Factura c/IVA",
+        TipoComprobanteSolicitado.FacturaElectronica => "Factura Electrónica",
+        _                                            => t.ToString()
+    };
+}

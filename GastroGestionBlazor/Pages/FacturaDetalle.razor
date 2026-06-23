@@ -1,0 +1,303 @@
+@page "/facturas/{Id:guid}"
+@attribute [Authorize(Roles = "Cajero,Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Clientes
+@using GastroGestionBlazor.Contracts.Facturacion
+@using GastroGestionBlazor.Contracts.Common
+@inject FacturaService FacturaService
+@inject ClienteService ClienteService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Detalle de factura · GastroGestión</PageTitle>
+
+<h3>Detalle de factura</h3>
+<hr class="custom-line" />
+
+<div class="form-row">
+    <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/facturas")'>
+        <i class="fas fa-arrow-left"></i> Volver
+    </button>
+</div>
+
+@if (_isLoading)
+{
+    <p>Cargando&hellip;</p>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <p class="text-danger">@_error</p>
+}
+else if (_factura is null)
+{
+    <p class="text-muted">No se encontró la factura.</p>
+}
+else
+{
+    <div class="detail-container">
+        <div class="detail-item"><label>Tipo</label><div>@GetTipoLabel(_factura.TipoComprobante)</div></div>
+        <div class="detail-item"><label>Estado</label><div><span class="badge @EstadoBadge(_factura.Estado)">@_factura.Estado.ToString()</span></div></div>
+        <div class="detail-item"><label>Fecha</label><div>@_factura.FechaAlta.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div></div>
+        <div class="detail-item"><label>Cliente</label><div>@ClienteLabel(_factura.ClienteId)</div></div>
+        @if (_factura.CAE is not null)
+        {
+            <div class="detail-item"><label>CAE</label><div>@_factura.CAE</div></div>
+            <div class="detail-item"><label>Vto. CAE</label><div>@_factura.VencimientoCAE?.ToString("dd/MM/yyyy")</div></div>
+        }
+    </div>
+
+    <h5 class="mt-4">Líneas</h5>
+    @if (_factura.Lineas.Count == 0)
+    {
+        <p class="text-muted">La factura no tiene líneas.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th class="text-end">Cantidad</th>
+                    <th class="text-end">Precio Unit.</th>
+                    <th class="text-end">IVA</th>
+                    <th class="text-end">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in _factura.Lineas)
+                {
+                    <tr>
+                        <td class="text-end">@l.Cantidad</td>
+                        <td class="text-end">@l.PrecioUnitario.ToString("N2") @l.Moneda</td>
+                        <td class="text-end">@l.IvaTasa.ToString("P1")</td>
+                        <td class="text-end">@((l.PrecioUnitario * l.Cantidad).ToString("N2")) @l.Moneda</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="3" class="text-end">Subtotal</th>
+                    <th class="text-end">@_factura.SubTotal.ToString("N2")</th>
+                </tr>
+                <tr>
+                    <th colspan="3" class="text-end">IVA</th>
+                    <th class="text-end">@_factura.TotalIVA.ToString("N2")</th>
+                </tr>
+                <tr>
+                    <th colspan="3" class="text-end">Total</th>
+                    <th class="text-end">@_factura.Total.ToString("N2")</th>
+                </tr>
+            </tfoot>
+        </table>
+    }
+
+    <h5 class="mt-4">Pagos</h5>
+    @if (_factura.Pagos.Count == 0)
+    {
+        <p class="text-muted">No hay pagos registrados.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th class="text-end">Monto</th>
+                    <th>Método</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in _factura.Pagos)
+                {
+                    <tr>
+                        <td>@p.FechaPago.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="text-end">@p.Monto.ToString("N2")</td>
+                        <td>@p.MetodoPago.ToString()</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th class="text-end" colspan="2">Total pagado</th>
+                    <th class="text-end">@_factura.TotalPagado.ToString("N2")</th>
+                </tr>
+            </tfoot>
+        </table>
+    }
+
+    @if (!_factura.EstaPagada && _factura.Estado == EstadoFactura.Creada)
+    {
+        <h5 class="mt-4">Registrar pago</h5>
+        <p class="text-muted">Pendiente: <strong>@((_factura.Total - _factura.TotalPagado).ToString("N2"))</strong></p>
+
+        @if (!string.IsNullOrEmpty(_pagoError))
+        {
+            <div class="alert alert-danger" role="alert">@_pagoError</div>
+        }
+
+        <div class="search-container">
+            <div class="form-group">
+                <label>Monto</label>
+                <input type="number" step="0.01" min="0.01" class="form-control" @bind="_pagoMonto" />
+            </div>
+            <div class="form-group">
+                <label>Método de pago</label>
+                <select class="form-select" @bind="_pagoMetodo">
+                    @foreach (MetodoPago m in Enum.GetValues(typeof(MetodoPago)))
+                    {
+                        <option value="@m">@m.ToString()</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <button class="btn btn-primary" disabled="@_registrandoPago" @onclick="RegistrarPago">
+                @(_registrandoPago ? "Registrando..." : "Registrar pago")
+            </button>
+        </div>
+    }
+
+    @if (_factura.Estado == EstadoFactura.Creada)
+    {
+        <div class="form-row mt-3">
+            <button class="btn btn-danger" disabled="@_cancelando" @onclick="Cancelar">
+                @(_cancelando ? "Cancelando..." : "Cancelar factura")
+            </button>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private string? _error;
+    private FacturaResponse? _factura;
+    private Dictionary<Guid, string> _clientes = new();
+
+    private decimal _pagoMonto = 0;
+    private MetodoPago _pagoMetodo = MetodoPago.Efectivo;
+    private bool _registrandoPago;
+    private string? _pagoError;
+    private bool _cancelando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var clienteList = await ClienteService.GetAllAsync();
+            _clientes = clienteList.ToDictionary(c => c.Id, c => c.Nombre);
+            await CargarFactura();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _isLoading = false;
+        }
+    }
+
+    private async Task CargarFactura()
+    {
+        _isLoading = true;
+        try
+        {
+            _factura = await FacturaService.GetFacturaByIdAsync(Id);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task RegistrarPago()
+    {
+        _pagoError = null;
+
+        if (_pagoMonto <= 0)
+        {
+            _pagoError = "El monto debe ser mayor a cero.";
+            return;
+        }
+
+        var pendiente = _factura!.Total - _factura.TotalPagado;
+        if (_pagoMonto > pendiente)
+        {
+            _pagoError = $"El monto no puede superar el pendiente ({pendiente:N2}).";
+            return;
+        }
+
+        _registrandoPago = true;
+        try
+        {
+            await FacturaService.RegistrarPagoAsync(Id, new RegistrarPagoRequest(_pagoMonto, _pagoMetodo));
+            _pagoMonto = 0;
+            _pagoMetodo = MetodoPago.Efectivo;
+            await CargarFactura();
+        }
+        catch (ApiException ex)
+        {
+            _pagoError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _pagoError = ex.Message;
+        }
+        finally
+        {
+            _registrandoPago = false;
+        }
+    }
+
+    private async Task Cancelar()
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", "¿Cancelar esta factura? No se puede deshacer.");
+        if (!ok)
+            return;
+
+        _cancelando = true;
+        try
+        {
+            await FacturaService.CancelarFacturaAsync(Id);
+            Navigation.NavigateTo("/facturas");
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _cancelando = false;
+        }
+    }
+
+    private string ClienteLabel(Guid id)
+        => _clientes.TryGetValue(id, out var n) ? n : "—";
+
+    private static string EstadoBadge(EstadoFactura estado) => estado switch
+    {
+        EstadoFactura.Creada    => "bg-warning text-dark",
+        EstadoFactura.Pagada    => "bg-success",
+        EstadoFactura.Cancelada => "bg-danger",
+        _                       => "bg-secondary"
+    };
+
+    private static string GetTipoLabel(TipoComprobante tipo) => tipo switch
+    {
+        TipoComprobante.TicketInterno      => "Ticket",
+        TipoComprobante.FacturaConIVA      => "Factura c/IVA",
+        TipoComprobante.FacturaElectronica => "Factura Elec.",
+        _                                  => tipo.ToString()
+    };
+}

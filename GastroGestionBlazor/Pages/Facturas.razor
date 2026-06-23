@@ -1,9 +1,164 @@
 @page "/facturas"
+@attribute [Authorize(Roles = "Cajero,Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Enums
+@using GastroGestionBlazor.Contracts.Clientes
+@using GastroGestionBlazor.Contracts.Facturacion
+@using GastroGestionBlazor.Contracts.Common
+@inject FacturaService FacturaService
+@inject ClienteService ClienteService
+@inject NavigationManager Navigation
 
 <PageTitle>Facturas · GastroGestión</PageTitle>
 
-<div class="placeholder-screen">
-    <span class="ph-icon"><i class="fas fa-file-invoice-dollar"></i></span>
-    <h3>Facturas</h3>
-    <p>La pantalla de facturación está en preparación. El backend ya emite comprobantes y registra pagos; la consulta desde acá llega pronto.</p>
+<h3>Facturas</h3>
+<hr class="custom-line" />
+
+<div class="form-row">
+    <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/facturas/crear")'>
+        <i class="fas fa-plus"></i> Nueva factura
+    </button>
 </div>
+
+<div class="search-container">
+    <div class="form-group">
+        <label>Estado</label>
+        <select class="form-select" @bind="_estadoFiltro" @bind:after="CargarFacturas">
+            <option value="">Todos</option>
+            @foreach (EstadoFactura e in Enum.GetValues(typeof(EstadoFactura)))
+            {
+                <option value="@e.ToString()">@e.ToString()</option>
+            }
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Cliente</label>
+        <select class="form-select" @bind="_clienteFiltro" @bind:after="CargarFacturas">
+            <option value="@Guid.Empty">Todos</option>
+            @foreach (var c in _clientes)
+            {
+                <option value="@c.Id">@c.Nombre</option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <p>Cargando&hellip;</p>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+else if (_facturas.Count == 0)
+{
+    <p class="text-muted">No hay facturas para mostrar.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Cliente</th>
+                <th class="text-end">Total</th>
+                <th class="text-end">Pagado</th>
+                <th class="text-end">Pendiente</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var f in _facturas)
+            {
+                <tr>
+                    <td>@f.FechaAlta.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                    <td>@GetTipoLabel(f.TipoComprobante)</td>
+                    <td><span class="badge @EstadoBadge(f.Estado)">@f.Estado.ToString()</span></td>
+                    <td>@ClienteLabel(f.ClienteId)</td>
+                    <td class="text-end">@f.Total.ToString("N2")</td>
+                    <td class="text-end">@f.TotalPagado.ToString("N2")</td>
+                    <td class="text-end">@((f.Total - f.TotalPagado).ToString("N2"))</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" @onclick='() => Navigation.NavigateTo($"/facturas/{f.Id}")'>
+                            <i class="fas fa-eye"></i> Ver detalle
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string? _error;
+    private string _estadoFiltro = "";
+    private Guid _clienteFiltro = Guid.Empty;
+
+    private List<FacturaResumenResponse> _facturas = new();
+    private List<ClienteResponse> _clientes = new();
+    private Dictionary<Guid, string> _clientesDict = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _clientes = await ClienteService.GetAllAsync();
+            _clientesDict = _clientes.ToDictionary(c => c.Id, c => c.Nombre);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        await CargarFacturas();
+    }
+
+    private async Task CargarFacturas()
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            EstadoFactura? estadoParam = string.IsNullOrEmpty(_estadoFiltro)
+                ? null
+                : Enum.Parse<EstadoFactura>(_estadoFiltro);
+            Guid? clienteParam = _clienteFiltro == Guid.Empty ? null : _clienteFiltro;
+
+            _facturas = await FacturaService.GetFacturasAsync(estadoParam, clienteParam);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string EstadoBadge(EstadoFactura estado) => estado switch
+    {
+        EstadoFactura.Creada    => "bg-warning text-dark",
+        EstadoFactura.Pagada    => "bg-success",
+        EstadoFactura.Cancelada => "bg-danger",
+        _                       => "bg-secondary"
+    };
+
+    private static string GetTipoLabel(TipoComprobante tipo) => tipo switch
+    {
+        TipoComprobante.TicketInterno      => "Ticket",
+        TipoComprobante.FacturaConIVA      => "Factura c/IVA",
+        TipoComprobante.FacturaElectronica => "Factura Elec.",
+        _                                  => tipo.ToString()
+    };
+
+    private string ClienteLabel(Guid id)
+        => _clientesDict.TryGetValue(id, out var n) ? n : "—";
+}
