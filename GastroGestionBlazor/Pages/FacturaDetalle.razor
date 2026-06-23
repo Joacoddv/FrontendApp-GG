@@ -15,10 +15,16 @@
 <h3>Detalle de factura</h3>
 <hr class="custom-line" />
 
-<div class="form-row">
+<div class="form-row no-print">
     <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/facturas")'>
         <i class="fas fa-arrow-left"></i> Volver
     </button>
+    @if (_factura is not null)
+    {
+        <button class="btn btn-outline-secondary ms-2" @onclick="Imprimir">
+            <i class="fas fa-print"></i> Imprimir
+        </button>
+    }
 </div>
 
 @if (_isLoading)
@@ -127,39 +133,41 @@ else
 
     @if (!_factura.EstaPagada && _factura.Estado == EstadoFactura.Creada)
     {
-        <h5 class="mt-4">Registrar pago</h5>
-        <p class="text-muted">Pendiente: <strong>@((_factura.Total - _factura.TotalPagado).ToString("N2"))</strong></p>
+        <div class="no-print">
+            <h5 class="mt-4">Registrar pago</h5>
+            <p class="text-muted">Pendiente: <strong>@((_factura.Total - _factura.TotalPagado).ToString("N2"))</strong></p>
 
-        @if (!string.IsNullOrEmpty(_pagoError))
-        {
-            <div class="alert alert-danger" role="alert">@_pagoError</div>
-        }
+            @if (!string.IsNullOrEmpty(_pagoError))
+            {
+                <div class="alert alert-danger" role="alert">@_pagoError</div>
+            }
 
-        <div class="search-container">
-            <div class="form-group">
-                <label>Monto</label>
-                <input type="number" step="0.01" min="0.01" class="form-control" @bind="_pagoMonto" />
+            <div class="search-container">
+                <div class="form-group">
+                    <label>Monto</label>
+                    <input type="number" step="0.01" min="0.01" class="form-control" @bind="_pagoMonto" />
+                </div>
+                <div class="form-group">
+                    <label>Método de pago</label>
+                    <select class="form-select" @bind="_pagoMetodo">
+                        @foreach (MetodoPago m in Enum.GetValues(typeof(MetodoPago)))
+                        {
+                            <option value="@m">@m.ToString()</option>
+                        }
+                    </select>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Método de pago</label>
-                <select class="form-select" @bind="_pagoMetodo">
-                    @foreach (MetodoPago m in Enum.GetValues(typeof(MetodoPago)))
-                    {
-                        <option value="@m">@m.ToString()</option>
-                    }
-                </select>
+            <div class="form-row">
+                <button class="btn btn-primary" disabled="@_registrandoPago" @onclick="RegistrarPago">
+                    @(_registrandoPago ? "Registrando..." : "Registrar pago")
+                </button>
             </div>
-        </div>
-        <div class="form-row">
-            <button class="btn btn-primary" disabled="@_registrandoPago" @onclick="RegistrarPago">
-                @(_registrandoPago ? "Registrando..." : "Registrar pago")
-            </button>
         </div>
     }
 
     @if (_factura.Estado == EstadoFactura.Creada)
     {
-        <div class="form-row mt-3">
+        <div class="form-row mt-3 no-print">
             <button class="btn btn-danger" disabled="@_cancelando" @onclick="Cancelar">
                 @(_cancelando ? "Cancelando..." : "Cancelar factura")
             </button>
@@ -281,6 +289,8 @@ else
             _cancelando = false;
         }
     }
+
+    private async Task Imprimir() => await JS.InvokeVoidAsync("print");
 
     private string ClienteLabel(Guid id)
         => _clientes.TryGetValue(id, out var n) ? n : "—";
