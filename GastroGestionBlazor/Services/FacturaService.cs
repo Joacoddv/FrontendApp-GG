@@ -90,6 +90,14 @@ public sealed class FacturaService
             await ThrowApiExceptionAsync(response, "No se pudo anular la factura.", ct);
     }
 
+    /// <summary>POST /facturas/{id}/cae — assigns the AFIP CAE to an electronic invoice.</summary>
+    public async Task AsignarCaeAsync(Guid id, AsignarCaeRequest request, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"facturas/{id}/cae", request, JsonOptions, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo asignar el CAE.", ct);
+    }
+
     /// <summary>GET /facturas/reporte — aggregated sales figures over an optional date range.</summary>
     public async Task<ReporteVentasResponse> GetReporteVentasAsync(
         DateTime? desde = null, DateTime? hasta = null, CancellationToken ct = default)
