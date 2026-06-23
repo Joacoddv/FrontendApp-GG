@@ -82,6 +82,14 @@ public sealed class FacturaService
             await ThrowApiExceptionAsync(response, "No se pudo cancelar la factura.", ct);
     }
 
+    /// <summary>POST /facturas/{id}/anular — annuls a paid invoice via a credit note.</summary>
+    public async Task AnularFacturaAsync(Guid id, AnularFacturaRequest request, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"facturas/{id}/anular", request, JsonOptions, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudo anular la factura.", ct);
+    }
+
     // POST returns the new Guid in the body; fall back to the Location header.
     private static async Task<Guid> ReadIdAsync(HttpResponseMessage response, CancellationToken ct)
     {

@@ -51,6 +51,11 @@ else
             <div class="detail-item"><label>CAE</label><div>@_factura.CAE</div></div>
             <div class="detail-item"><label>Vto. CAE</label><div>@_factura.VencimientoCAE?.ToString("dd/MM/yyyy")</div></div>
         }
+        @if (_factura.Estado == EstadoFactura.Anulada)
+        {
+            <div class="detail-item"><label>Motivo de anulación</label><div>@_factura.MotivoAnulacion</div></div>
+            <div class="detail-item"><label>Fecha de anulación</label><div>@_factura.FechaAnulacion?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div></div>
+        }
     </div>
 
     <h5 class="mt-4">Líneas</h5>
@@ -173,6 +178,28 @@ else
             </button>
         </div>
     }
+
+    @if (_factura.Estado == EstadoFactura.Pagada)
+    {
+        <div class="no-print">
+            <h5 class="mt-4">Nota de crédito / anular</h5>
+            @if (!string.IsNullOrEmpty(_anularError))
+            {
+                <div class="alert alert-danger" role="alert">@_anularError</div>
+            }
+            <div class="search-container">
+                <div class="form-group" style="flex:1 1 auto">
+                    <label>Motivo de la anulación</label>
+                    <input class="form-control" @bind="_motivoAnulacion" placeholder="Ej: producto devuelto por el cliente" />
+                </div>
+            </div>
+            <div class="form-row">
+                <button class="btn btn-danger" disabled="@_anulando" @onclick="Anular">
+                    @(_anulando ? "Anulando..." : "Anular con nota de crédito")
+                </button>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -188,6 +215,10 @@ else
     private bool _registrandoPago;
     private string? _pagoError;
     private bool _cancelando;
+
+    private string _motivoAnulacion = "";
+    private bool _anulando;
+    private string? _anularError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -290,6 +321,42 @@ else
         }
     }
 
+    private async Task Anular()
+    {
+        _anularError = null;
+
+        if (string.IsNullOrWhiteSpace(_motivoAnulacion))
+        {
+            _anularError = "Ingresá el motivo de la anulación.";
+            return;
+        }
+
+        var ok = await JS.InvokeAsync<bool>("confirm",
+            "¿Anular esta factura con una nota de crédito? No se puede deshacer.");
+        if (!ok)
+            return;
+
+        _anulando = true;
+        try
+        {
+            await FacturaService.AnularFacturaAsync(Id, new AnularFacturaRequest(_motivoAnulacion.Trim()));
+            _motivoAnulacion = "";
+            await CargarFactura();
+        }
+        catch (ApiException ex)
+        {
+            _anularError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _anularError = ex.Message;
+        }
+        finally
+        {
+            _anulando = false;
+        }
+    }
+
     private async Task Imprimir() => await JS.InvokeVoidAsync("print");
 
     private string ClienteLabel(Guid id)
@@ -300,6 +367,7 @@ else
         EstadoFactura.Creada    => "bg-warning text-dark",
         EstadoFactura.Pagada    => "bg-success",
         EstadoFactura.Cancelada => "bg-danger",
+        EstadoFactura.Anulada   => "bg-dark",
         _                       => "bg-secondary"
     };
 
