@@ -12,3 +12,5 @@ public sealed record RegistrarPagoRequest(
     MetodoPago MetodoPago);
 
 public sealed record AnularFacturaRequest(string Motivo);
+
+public sealed record AsignarCaeRequest(string Cae, DateOnly Vencimiento);

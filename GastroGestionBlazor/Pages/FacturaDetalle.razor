@@ -200,6 +200,36 @@ else
             </div>
         </div>
     }
+
+    @if (_factura.TipoComprobante == TipoComprobante.FacturaElectronica
+         && _factura.CAE is null
+         && _factura.Estado != EstadoFactura.Cancelada
+         && _factura.Estado != EstadoFactura.Anulada)
+    {
+        <div class="no-print">
+            <h5 class="mt-4">Asignar CAE (AFIP)</h5>
+            <p class="text-muted small">Esta factura electrónica aún no tiene CAE asignado.</p>
+            @if (!string.IsNullOrEmpty(_caeError))
+            {
+                <div class="alert alert-danger" role="alert">@_caeError</div>
+            }
+            <div class="search-container">
+                <div class="form-group">
+                    <label>CAE</label>
+                    <input class="form-control" maxlength="14" @bind="_cae" />
+                </div>
+                <div class="form-group">
+                    <label>Vencimiento</label>
+                    <input type="date" class="form-control" @bind="_vencimientoCae" />
+                </div>
+            </div>
+            <div class="form-row">
+                <button class="btn btn-primary" disabled="@_asignandoCae" @onclick="AsignarCae">
+                    @(_asignandoCae ? "Asignando..." : "Asignar CAE")
+                </button>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -219,6 +249,11 @@ else
     private string _motivoAnulacion = "";
     private bool _anulando;
     private string? _anularError;
+
+    private string _cae = "";
+    private DateOnly? _vencimientoCae;
+    private bool _asignandoCae;
+    private string? _caeError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -354,6 +389,43 @@ else
         finally
         {
             _anulando = false;
+        }
+    }
+
+    private async Task AsignarCae()
+    {
+        _caeError = null;
+
+        if (string.IsNullOrWhiteSpace(_cae))
+        {
+            _caeError = "Ingresá el CAE.";
+            return;
+        }
+        if (_vencimientoCae is null)
+        {
+            _caeError = "Ingresá el vencimiento del CAE.";
+            return;
+        }
+
+        _asignandoCae = true;
+        try
+        {
+            await FacturaService.AsignarCaeAsync(Id, new AsignarCaeRequest(_cae.Trim(), _vencimientoCae.Value));
+            _cae = "";
+            _vencimientoCae = null;
+            await CargarFactura();
+        }
+        catch (ApiException ex)
+        {
+            _caeError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _caeError = ex.Message;
+        }
+        finally
+        {
+            _asignandoCae = false;
         }
     }
 
