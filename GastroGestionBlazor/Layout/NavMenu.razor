@@ -30,6 +30,11 @@
         <li class="nav-item">
             <NavLink class="nav-link" href="facturas"><i class="fas fa-file-invoice-dollar"></i>Facturas</NavLink>
         </li>
+        <AuthorizeView Roles="Cajero,Administrador">
+            <li class="nav-item">
+                <NavLink class="nav-link" href="reportes"><i class="fas fa-chart-pie"></i>Reportes</NavLink>
+            </li>
+        </AuthorizeView>
         <li class="nav-item">
             <NavLink class="nav-link" href="platos"><i class="fas fa-utensils"></i>Platos</NavLink>
         </li>
