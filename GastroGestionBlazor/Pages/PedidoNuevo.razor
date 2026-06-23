@@ -52,7 +52,7 @@ else
 
         <div class="detail-item">
             <label>Cliente</label>
-            <select @bind="_clienteId" class="form-select">
+            <select @bind="_clienteId" @bind:after="OnClienteChanged" class="form-select">
                 <option value="">— Sin cliente —</option>
                 @foreach (var c in _clientes)
                 {
@@ -83,6 +83,19 @@ else
             <div style="flex-basis:100%">
                 <h6 class="mb-2"><i class="fas fa-motorcycle"></i> Dirección de entrega</h6>
             </div>
+            @if (DireccionesDelCliente.Count > 0)
+            {
+                <div class="detail-item" style="flex-basis:100%">
+                    <label>Usar dirección guardada del cliente</label>
+                    <select class="form-select" @bind="_direccionGuardadaId" @bind:after="OnDireccionGuardadaChanged">
+                        <option value="@Guid.Empty">— Escribir una dirección nueva —</option>
+                        @foreach (var d in DireccionesDelCliente)
+                        {
+                            <option value="@d.Id">@FormatDireccionOption(d)</option>
+                        }
+                    </select>
+                </div>
+            }
             <div class="detail-item"><label>Calle <span class="text-danger">*</span></label><input @bind="_dir.Calle" class="form-control" /></div>
             <div class="detail-item"><label>Número <span class="text-danger">*</span></label><input @bind="_dir.Numero" class="form-control" /></div>
             <div class="detail-item"><label>Ciudad <span class="text-danger">*</span></label><input @bind="_dir.Ciudad" class="form-control" /></div>
@@ -144,7 +157,14 @@ else
     private TipoPedido _tipo = TipoPedido.Salon;
     private Guid? _mesaId;
     private Guid? _clienteId;
+    private Guid _direccionGuardadaId = Guid.Empty;
     private readonly DireccionModel _dir = new();
+
+    private ClienteResponse? ClienteSeleccionado
+        => _clienteId is { } id && id != Guid.Empty ? _clientes.FirstOrDefault(c => c.Id == id) : null;
+
+    private IReadOnlyList<DireccionResponse> DireccionesDelCliente
+        => ClienteSeleccionado?.Direcciones ?? (IReadOnlyList<DireccionResponse>)Array.Empty<DireccionResponse>();
     private readonly List<LineaModel> _lineas = new();
 
     protected override async Task OnInitializedAsync()
@@ -168,6 +188,31 @@ else
 
     private void AgregarLinea() => _lineas.Add(new LineaModel());
     private void QuitarLinea(LineaModel linea) => _lineas.Remove(linea);
+
+    // Reset the saved-address picker and typed address whenever the client changes.
+    private void OnClienteChanged()
+    {
+        _direccionGuardadaId = Guid.Empty;
+        _dir.Reset();
+    }
+
+    // Pre-fill the editable address fields from the chosen saved address (snapshot copy).
+    private void OnDireccionGuardadaChanged()
+    {
+        var d = ClienteSeleccionado?.Direcciones?.FirstOrDefault(x => x.Id == _direccionGuardadaId);
+        if (d is not null)
+            _dir.LoadFrom(d);
+        else
+            _dir.Reset();
+    }
+
+    private static string FormatDireccionOption(DireccionResponse d)
+    {
+        var s = $"{d.Calle} {d.Numero}, {d.Ciudad}";
+        if (!string.IsNullOrWhiteSpace(d.Piso)) s += $", piso {d.Piso}";
+        if (!string.IsNullOrWhiteSpace(d.Departamento)) s += $" dto. {d.Departamento}";
+        return s;
+    }
 
     private async Task GuardarPedido()
     {
@@ -240,6 +285,7 @@ else
         _tipo = TipoPedido.Salon;
         _mesaId = null;
         _clienteId = null;
+        _direccionGuardadaId = Guid.Empty;
         _dir.Reset();
         _lineas.Clear();
         _lineas.Add(new LineaModel());
@@ -279,6 +325,17 @@ else
             !string.IsNullOrWhiteSpace(Calle) && !string.IsNullOrWhiteSpace(Numero) &&
             !string.IsNullOrWhiteSpace(Ciudad) && !string.IsNullOrWhiteSpace(Provincia) &&
             !string.IsNullOrWhiteSpace(CodigoPostal);
+
+        public void LoadFrom(DireccionResponse d)
+        {
+            Calle = d.Calle;
+            Numero = d.Numero;
+            Ciudad = d.Ciudad;
+            Provincia = d.Provincia;
+            CodigoPostal = d.CodigoPostal;
+            Piso = d.Piso;
+            Departamento = d.Departamento;
+        }
 
         public DireccionEntregaRequest ToRequest() =>
             new(Calle.Trim(), Numero.Trim(), Ciudad.Trim(), Provincia.Trim(), CodigoPostal.Trim(),
