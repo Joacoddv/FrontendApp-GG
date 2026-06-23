@@ -54,10 +54,17 @@ else
                 <div>
                     @FormatDireccion(dir)
                     <a class="btn btn-outline-secondary btn-sm ms-2" target="_blank" rel="noopener"
-                       href="@MapsUrl(dir)" title="Abrir en Google Maps">
-                        <i class="fas fa-map-location-dot"></i> Ver en el mapa
+                       href="@MapsUrl(dir)" title="Abrir en pantalla completa">
+                        <i class="fas fa-map-location-dot"></i> Pantalla completa
                     </a>
                 </div>
+                <iframe class="mt-2"
+                        style="width:100%; height:300px; border:0; border-radius:8px;"
+                        src="@MapsEmbedUrl(dir)"
+                        title="Mapa de la dirección de entrega"
+                        loading="lazy"
+                        referrerpolicy="no-referrer-when-downgrade"
+                        allowfullscreen></iframe>
             </div>
         }
     </div>
@@ -441,12 +448,17 @@ else
     private static string Money(decimal? monto, string? moneda)
         => monto is { } m ? $"{m:N2} {moneda}".Trim() : "—";
 
-    // Keyless Google Maps web link (no API key / billing needed) for the delivery address.
+    // Address string used to geocode the delivery point on Google Maps.
+    private static string AddressQuery(DireccionEntregaResponse d)
+        => $"{d.Calle} {d.Numero}, {d.Ciudad}, {d.Provincia} {d.CodigoPostal}";
+
+    // Keyless Google Maps web link (no API key / billing needed) — opens full screen in a new tab.
     private static string MapsUrl(DireccionEntregaResponse d)
-    {
-        var query = $"{d.Calle} {d.Numero}, {d.Ciudad}, {d.Provincia} {d.CodigoPostal}";
-        return "https://www.google.com/maps/search/?api=1&query=" + Uri.EscapeDataString(query);
-    }
+        => "https://www.google.com/maps/search/?api=1&query=" + Uri.EscapeDataString(AddressQuery(d));
+
+    // Keyless Google Maps embed (no API key / billing needed) for the inline iframe.
+    private static string MapsEmbedUrl(DireccionEntregaResponse d)
+        => "https://maps.google.com/maps?q=" + Uri.EscapeDataString(AddressQuery(d)) + "&z=15&output=embed";
 
     private static string FormatDireccion(DireccionEntregaResponse d)
     {
