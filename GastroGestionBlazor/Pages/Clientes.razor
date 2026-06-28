@@ -49,8 +49,10 @@ else
         <thead>
             <tr>
                 <th>Nombre</th>
+                <th>Apellido</th>
                 <th>Condición IVA</th>
                 <th>CUIT</th>
+                <th>Teléfono</th>
                 <th>Email</th>
                 <th>Activo</th>
                 <th>Acciones</th>
@@ -61,8 +63,10 @@ else
             {
                 <tr class="@(cliente.Activo ? "" : "text-muted")">
                     <td>@cliente.Nombre</td>
+                    <td>@cliente.Apellido</td>
                     <td>@cliente.CondicionIVA</td>
                     <td>@cliente.Cuit</td>
+                    <td>@cliente.Telefono</td>
                     <td>@cliente.Email</td>
                     <td>
                         @if (cliente.Activo)
@@ -95,12 +99,24 @@ else
                 <input value="@clienteSeleccionado.Nombre" disabled />
             </div>
             <div class="detail-item">
+                <label>Apellido:</label>
+                <input value="@clienteSeleccionado.Apellido" disabled />
+            </div>
+            <div class="detail-item">
                 <label>Condición IVA:</label>
                 <input value="@clienteSeleccionado.CondicionIVA" disabled />
             </div>
             <div class="detail-item">
                 <label>CUIT:</label>
                 <input value="@clienteSeleccionado.Cuit" disabled />
+            </div>
+            <div class="detail-item">
+                <label>DNI:</label>
+                <input value="@clienteSeleccionado.Dni" disabled />
+            </div>
+            <div class="detail-item">
+                <label>Teléfono:</label>
+                <input value="@clienteSeleccionado.Telefono" disabled />
             </div>
             <div class="detail-item">
                 <label>Email:</label>
@@ -154,6 +170,7 @@ else
             <input @bind="nuevaDireccion.CodigoPostal" class="form-control" style="width:90px" placeholder="CP *" />
             <input @bind="nuevaDireccion.Piso" class="form-control" style="width:80px" placeholder="Piso" />
             <input @bind="nuevaDireccion.Departamento" class="form-control" style="width:80px" placeholder="Dto." />
+            <input @bind="nuevaDireccion.Zona" class="form-control" style="width:120px" placeholder="Zona" />
             <button class="btn btn-secondary" disabled="@isSaving" @onclick="AgregarDireccion"><i class="fas fa-plus"></i> Agregar dirección</button>
         </div>
 
@@ -176,6 +193,10 @@ else
                 <input @bind="editModel.Nombre" class="form-control" />
             </div>
             <div class="detail-item">
+                <label>Apellido:</label>
+                <input @bind="editModel.Apellido" class="form-control" />
+            </div>
+            <div class="detail-item">
                 <label>Condición IVA: <span class="text-danger">*</span></label>
                 <select @bind="editModel.CondicionIVA" class="form-control">
                     @foreach (var valor in Enum.GetValues<CondicionIVA>())
@@ -187,6 +208,14 @@ else
             <div class="detail-item">
                 <label>CUIT:</label>
                 <input @bind="editModel.Cuit" class="form-control" />
+            </div>
+            <div class="detail-item">
+                <label>DNI:</label>
+                <input @bind="editModel.Dni" class="form-control" />
+            </div>
+            <div class="detail-item">
+                <label>Teléfono:</label>
+                <input @bind="editModel.Telefono" class="form-control" />
             </div>
             <div class="detail-item">
                 <label>Email:</label>
@@ -220,6 +249,10 @@ else
             <input @bind="nuevoCliente.Nombre" class="form-control" />
         </div>
         <div class="detail-item">
+            <label>Apellido:</label>
+            <input @bind="nuevoCliente.Apellido" class="form-control" />
+        </div>
+        <div class="detail-item">
             <label>Condición IVA: <span class="text-danger">*</span></label>
             <select @bind="nuevoCliente.CondicionIVA" class="form-control">
                 @foreach (var valor in Enum.GetValues<CondicionIVA>())
@@ -231,6 +264,14 @@ else
         <div class="detail-item">
             <label>CUIT:</label>
             <input @bind="nuevoCliente.Cuit" class="form-control" />
+        </div>
+        <div class="detail-item">
+            <label>DNI:</label>
+            <input @bind="nuevoCliente.Dni" class="form-control" />
+        </div>
+        <div class="detail-item">
+            <label>Teléfono:</label>
+            <input @bind="nuevoCliente.Telefono" class="form-control" />
         </div>
         <div class="detail-item">
             <label>Email:</label>
@@ -308,9 +349,12 @@ else
         editModel = new EditarClienteModel
         {
             Nombre = cliente.Nombre,
+            Apellido = cliente.Apellido,
             CondicionIVA = cliente.CondicionIVA,
             Cuit = cliente.Cuit,
             Email = cliente.Email,
+            Telefono = cliente.Telefono,
+            Dni = cliente.Dni,
             FechaNacimiento = cliente.FechaNacimiento
         };
         editErrorMessage = null;
@@ -357,7 +401,10 @@ else
                 editModel.CondicionIVA,
                 string.IsNullOrWhiteSpace(editModel.Cuit) ? null : editModel.Cuit,
                 string.IsNullOrWhiteSpace(editModel.Email) ? null : editModel.Email,
-                editModel.FechaNacimiento);
+                editModel.FechaNacimiento,
+                string.IsNullOrWhiteSpace(editModel.Apellido) ? null : editModel.Apellido,
+                string.IsNullOrWhiteSpace(editModel.Telefono) ? null : editModel.Telefono,
+                string.IsNullOrWhiteSpace(editModel.Dni) ? null : editModel.Dni);
 
             await ClienteService.UpdateAsync(clienteEnEdicion.Id, req);
             CerrarEdicion();
@@ -415,7 +462,10 @@ else
                 nuevoCliente.CondicionIVA,
                 string.IsNullOrWhiteSpace(nuevoCliente.Cuit) ? null : nuevoCliente.Cuit,
                 string.IsNullOrWhiteSpace(nuevoCliente.Email) ? null : nuevoCliente.Email,
-                nuevoCliente.FechaNacimiento);
+                nuevoCliente.FechaNacimiento,
+                string.IsNullOrWhiteSpace(nuevoCliente.Apellido) ? null : nuevoCliente.Apellido,
+                string.IsNullOrWhiteSpace(nuevoCliente.Telefono) ? null : nuevoCliente.Telefono,
+                string.IsNullOrWhiteSpace(nuevoCliente.Dni) ? null : nuevoCliente.Dni);
 
             await ClienteService.CreateAsync(request);
             showCreateForm = false;
@@ -445,9 +495,12 @@ else
     private class NuevoClienteModel
     {
         public string Nombre { get; set; } = string.Empty;
+        public string? Apellido { get; set; }
         public CondicionIVA CondicionIVA { get; set; } = CondicionIVA.ConsumidorFinal;
         public string? Cuit { get; set; }
         public string? Email { get; set; }
+        public string? Telefono { get; set; }
+        public string? Dni { get; set; }
         public DateOnly? FechaNacimiento { get; set; }
     }
 
@@ -455,9 +508,12 @@ else
     private class EditarClienteModel
     {
         public string Nombre { get; set; } = string.Empty;
+        public string? Apellido { get; set; }
         public CondicionIVA CondicionIVA { get; set; } = CondicionIVA.ConsumidorFinal;
         public string? Cuit { get; set; }
         public string? Email { get; set; }
+        public string? Telefono { get; set; }
+        public string? Dni { get; set; }
         public DateOnly? FechaNacimiento { get; set; }
     }
 
@@ -474,8 +530,9 @@ else
         public string? CodigoPostal { get; set; }
         public string? Piso { get; set; }
         public string? Departamento { get; set; }
+        public string? Zona { get; set; }
 
-        public void Reset() { Calle = Numero = Ciudad = Provincia = CodigoPostal = Piso = Departamento = null; }
+        public void Reset() { Calle = Numero = Ciudad = Provincia = CodigoPostal = Piso = Departamento = Zona = null; }
     }
 
     private async Task AgregarDireccion()
@@ -498,7 +555,8 @@ else
                 nuevaDireccion.Calle!.Trim(), nuevaDireccion.Numero!.Trim(), nuevaDireccion.Ciudad!.Trim(),
                 nuevaDireccion.Provincia!.Trim(), nuevaDireccion.CodigoPostal!.Trim(),
                 string.IsNullOrWhiteSpace(nuevaDireccion.Piso) ? null : nuevaDireccion.Piso!.Trim(),
-                string.IsNullOrWhiteSpace(nuevaDireccion.Departamento) ? null : nuevaDireccion.Departamento!.Trim());
+                string.IsNullOrWhiteSpace(nuevaDireccion.Departamento) ? null : nuevaDireccion.Departamento!.Trim(),
+                string.IsNullOrWhiteSpace(nuevaDireccion.Zona) ? null : nuevaDireccion.Zona!.Trim());
 
             var updated = await ClienteService.AgregarDireccionAsync(clienteSeleccionado.Id, req);
             if (updated is not null) clienteSeleccionado = updated;

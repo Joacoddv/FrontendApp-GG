@@ -105,6 +105,7 @@ else
             <div class="detail-item"><label>Código postal <span class="text-danger">*</span></label><input @bind="_dir.CodigoPostal" class="form-control" /></div>
             <div class="detail-item"><label>Piso</label><input @bind="_dir.Piso" class="form-control" /></div>
             <div class="detail-item"><label>Departamento</label><input @bind="_dir.Departamento" class="form-control" /></div>
+            <div class="detail-item"><label>Zona</label><input @bind="_dir.Zona" class="form-control" /></div>
         }
 
         <div style="flex-basis:100%">
@@ -335,6 +336,7 @@ else
         public string CodigoPostal { get; set; } = "";
         public string? Piso { get; set; }
         public string? Departamento { get; set; }
+        public string? Zona { get; set; }
 
         public bool IsComplete() =>
             !string.IsNullOrWhiteSpace(Calle) && !string.IsNullOrWhiteSpace(Numero) &&
@@ -350,17 +352,19 @@ else
             CodigoPostal = d.CodigoPostal;
             Piso = d.Piso;
             Departamento = d.Departamento;
+            Zona = d.Zona;
         }
 
         public DireccionEntregaRequest ToRequest() =>
             new(Calle.Trim(), Numero.Trim(), Ciudad.Trim(), Provincia.Trim(), CodigoPostal.Trim(),
                 string.IsNullOrWhiteSpace(Piso) ? null : Piso!.Trim(),
-                string.IsNullOrWhiteSpace(Departamento) ? null : Departamento!.Trim());
+                string.IsNullOrWhiteSpace(Departamento) ? null : Departamento!.Trim(),
+                string.IsNullOrWhiteSpace(Zona) ? null : Zona!.Trim());
 
         public void Reset()
         {
             Calle = Numero = Ciudad = Provincia = CodigoPostal = "";
-            Piso = Departamento = null;
+            Piso = Departamento = Zona = null;
         }
     }
 }

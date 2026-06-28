@@ -10,7 +10,10 @@ public sealed record ClienteResponse(
     string? Email,
     bool Activo,
     DateOnly? FechaNacimiento = null,
-    IReadOnlyList<DireccionResponse>? Direcciones = null);
+    IReadOnlyList<DireccionResponse>? Direcciones = null,
+    string? Apellido = null,
+    string? Telefono = null,
+    string? Dni = null);
 
 public sealed record DireccionResponse(
     Guid Id,
@@ -20,7 +23,8 @@ public sealed record DireccionResponse(
     string Provincia,
     string CodigoPostal,
     string? Piso,
-    string? Departamento);
+    string? Departamento,
+    string? Zona = null);
 
 /// <summary>Body for POST /clientes/{id}/direcciones.</summary>
 public sealed record AgregarDireccionRequest(
@@ -30,7 +34,8 @@ public sealed record AgregarDireccionRequest(
     string Provincia,
     string CodigoPostal,
     string? Piso,
-    string? Departamento);
+    string? Departamento,
+    string? Zona = null);
 
 /// <summary>Row of GET /clientes/cumpleaneros.</summary>
 public sealed record CumpleaneroResponse(Guid Id, string Nombre, string? Email, DateOnly FechaNacimiento);
