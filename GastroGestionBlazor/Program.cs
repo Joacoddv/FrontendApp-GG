@@ -59,6 +59,7 @@ builder.Services.AddScoped<KitchenBoardService>();
 builder.Services.AddScoped<PlatoService>();
 builder.Services.AddScoped<MenuService>();
 builder.Services.AddScoped<PedidoService>();
+builder.Services.AddScoped<MesaService>();
 builder.Services.AddScoped<StockService>();
 builder.Services.AddScoped<ProveedorService>();
 builder.Services.AddScoped<FacturaService>();
