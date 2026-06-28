@@ -32,3 +32,9 @@ public sealed record MovimientoStockResponse(
     decimal Cantidad,
     DateTime FechaMovimiento,
     Guid? ProveedorId);
+
+/// <summary>Per-dish producible count (GET /stock/producibles).</summary>
+public sealed record PlatoProducibleResponse(
+    Guid PlatoId,
+    string Nombre,
+    int MaxProducible);
