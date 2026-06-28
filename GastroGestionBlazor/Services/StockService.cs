@@ -20,6 +20,17 @@ public sealed class StockService
 
     public StockService(HttpClient httpClient) => _httpClient = httpClient;
 
+    /// <summary>GET /stock/producibles — maximum producible quantity per active dish.</summary>
+    public async Task<List<PlatoProducibleResponse>> GetProduciblesAsync(CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync("stock/producibles", ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, "No se pudieron cargar los producibles.", ct);
+
+        var result = await response.Content.ReadFromJsonAsync<List<PlatoProducibleResponse>>(JsonOptions, ct);
+        return result ?? new List<PlatoProducibleResponse>();
+    }
+
     /// <summary>GET /stock/balances — current balance for every ingredient.</summary>
     public async Task<List<IngredienteBalanceResponse>> GetBalancesAsync(CancellationToken ct = default)
     {
