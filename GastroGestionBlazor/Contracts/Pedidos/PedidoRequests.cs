@@ -19,7 +19,8 @@ public sealed record DireccionEntregaRequest(
     string Provincia,
     string CodigoPostal,
     string? Piso,
-    string? Departamento);
+    string? Departamento,
+    string? Zona = null);
 
 /// <summary>Request body for POST /pedidos/{id}/lineas.</summary>
 public sealed record AgregarLineaRequest(
