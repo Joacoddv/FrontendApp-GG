@@ -7,9 +7,11 @@
 @using GastroGestionBlazor.Contracts.Platos
 @using GastroGestionBlazor.Contracts.Pedidos
 @using GastroGestionBlazor.Contracts.Common
+@using GastroGestionBlazor.Contracts.Stock
 @inject PedidoService PedidoService
 @inject PlatoService PlatoService
 @inject ClienteService ClienteService
+@inject StockService StockService
 @inject NavigationManager Navigation
 
 <PageTitle>Nuevo pedido · GastroGestión</PageTitle>
@@ -119,12 +121,16 @@ else
                             <option value="@Guid.Empty">— Plato —</option>
                             @foreach (var p in _platos)
                             {
-                                <option value="@p.Id">@p.Nombre (@p.PrecioBase.ToString("N2") @p.Moneda)</option>
+                                var prod = GetProducible(p.Id);
+                                var sinStock = prod == 0;
+                                <option value="@p.Id" disabled="@sinStock">
+                                    @p.Nombre (@p.PrecioBase.ToString("N2") @p.Moneda) — @(sinStock ? "sin stock" : $"{prod} producibles")
+                                </option>
                             }
                         </select>
                     </div>
                     <div style="width:110px">
-                        <input type="number" min="1" step="1" @bind="linea.Cantidad" class="form-control" placeholder="Cant." />
+                        <input type="number" min="1" step="1" max="@GetProducible(linea.PlatoId)" @bind="linea.Cantidad" class="form-control" placeholder="Cant." />
                     </div>
                     <div style="flex:1 1 auto">
                         <input @bind="linea.Observaciones" class="form-control" placeholder="Observaciones (opcional)" />
@@ -153,6 +159,7 @@ else
     private List<MesaResponse> _mesas = new();
     private List<PlatoResponse> _platos = new();
     private List<ClienteResponse> _clientes = new();
+    private Dictionary<Guid, int> _producibles = new();
 
     private TipoPedido _tipo = TipoPedido.Salon;
     private Guid? _mesaId;
@@ -174,6 +181,10 @@ else
             _platos = (await PlatoService.GetAllAsync()).Where(p => p.Activo).ToList();
             _mesas = (await PedidoService.GetMesasAsync()).Where(m => m.Activa).ToList();
             _clientes = (await ClienteService.GetAllAsync()).Where(c => c.Activo).ToList();
+
+            var producibles = await StockService.GetProduciblesAsync();
+            _producibles = producibles.ToDictionary(p => p.PlatoId, p => p.MaxProducible);
+
             _lineas.Add(new LineaModel());
         }
         catch (Exception ex)
@@ -185,6 +196,10 @@ else
             _isLoading = false;
         }
     }
+
+    /// <summary>Returns the max producible for a dish, or 0 if unknown / no stock.</summary>
+    private int GetProducible(Guid platoId)
+        => platoId != Guid.Empty && _producibles.TryGetValue(platoId, out var max) ? max : 0;
 
     private void AgregarLinea() => _lineas.Add(new LineaModel());
     private void QuitarLinea(LineaModel linea) => _lineas.Remove(linea);
