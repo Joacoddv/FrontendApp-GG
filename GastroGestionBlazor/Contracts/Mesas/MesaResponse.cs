@@ -10,4 +10,6 @@ public sealed record MesaResponse(
     int Capacidad,
     string Estado,
     bool Activa,
-    Guid? PedidoActivoId);
+    Guid? PedidoActivoId,
+    int? PosicionX,
+    int? PosicionY);

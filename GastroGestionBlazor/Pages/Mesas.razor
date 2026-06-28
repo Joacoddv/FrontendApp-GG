@@ -1,0 +1,320 @@
+@page "/mesas"
+@attribute [Authorize(Roles = "Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using GastroGestionBlazor.Contracts.Mesas
+@using GastroGestionBlazor.Contracts.Common
+@inject MesaService MesaService
+@inject IJSRuntime JS
+
+<PageTitle>Mesas · GastroGestión</PageTitle>
+
+<h3>Mesas</h3>
+<hr class="custom-line" />
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+@if (!string.IsNullOrEmpty(_ok))
+{
+    <div class="alert alert-success" role="alert">@_ok</div>
+}
+
+@if (_isLoading)
+{
+    <p>Cargando&hellip;</p>
+}
+else
+{
+    @* ---------- a. Floor designer (pure Blazor drag-and-drop) ---------- *@
+    <h5>Plano del salón</h5>
+    <p class="text-muted">Arrastrá cada mesa para ubicarla. La posición se guarda automáticamente.</p>
+
+    <div class="mesa-canvas"
+         style="position: relative; width: 100%; min-height: 500px; border: 2px dashed #ccc; border-radius: 8px; background: #fafafa; overflow: hidden;"
+         @ondragover:preventDefault="true"
+         @ondrop="OnDrop">
+        @foreach (var m in ActiveMesas())
+        {
+            var (x, y) = PositionFor(m);
+            <div draggable="true"
+                 @ondragstart="() => OnDragStart(m)"
+                 style="position: absolute; left: @(x)px; top: @(y)px; width: 70px; height: 70px; cursor: move; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; background: #0d6efd; color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.3); user-select: none;"
+                 title="Mesa @m.Numero — capacidad @m.Capacidad">
+                <strong>@m.Numero</strong>
+                <small><i class="fas fa-chair"></i> @m.Capacidad</small>
+            </div>
+        }
+    </div>
+
+    @* ---------- b. Management table (create / edit / deactivate) ---------- *@
+    <h5 class="mt-4">Administración de mesas</h5>
+
+    <div class="search-container">
+        <div class="form-group">
+            <label>@(_editId is null ? "Nueva mesa" : "Editar mesa")</label>
+            <input type="number" class="form-control" @bind="_form.Numero" placeholder="Número *" />
+        </div>
+        <div class="form-group">
+            <label>Capacidad</label>
+            <input type="number" class="form-control" @bind="_form.Capacidad" placeholder="Capacidad *" />
+        </div>
+        <div class="form-group">
+            <button class="btn btn-primary" disabled="@_saving" @onclick="Guardar">
+                @(_saving ? "Guardando..." : _editId is null ? "Crear" : "Guardar cambios")
+            </button>
+            @if (_editId is not null)
+            {
+                <button class="btn btn-secondary ms-1" @onclick="CancelarEdicion">Cancelar</button>
+            }
+        </div>
+    </div>
+
+    @if (_mesas.Count == 0)
+    {
+        <p class="text-muted">No hay mesas.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Capacidad</th>
+                    <th>Activa</th>
+                    <th>Posición</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in _mesas)
+                {
+                    <tr>
+                        <td>@m.Numero</td>
+                        <td>@m.Capacidad</td>
+                        <td>
+                            @if (m.Activa)
+                            {
+                                <span class="badge bg-success">Sí</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">No</span>
+                            }
+                        </td>
+                        <td>
+                            @if (m.PosicionX is { } px && m.PosicionY is { } py)
+                            {
+                                @($"{px}, {py}")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Sin ubicar</span>
+                            }
+                        </td>
+                        <td class="action-buttons">
+                            <button class="btn btn-warning btn-sm" title="Editar" @onclick="() => Editar(m)"><i class="fas fa-edit"></i></button>
+                            @if (m.Activa)
+                            {
+                                <button class="btn btn-danger btn-sm" title="Desactivar" disabled="@_saving" @onclick="() => Desactivar(m)"><i class="fas fa-trash"></i></button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _saving;
+    private string? _error;
+    private string? _ok;
+
+    private List<MesaResponse> _mesas = new();
+
+    private Guid? _editId;
+    private readonly FormModel _form = new();
+
+    // The mesa currently being dragged on the floor designer.
+    private MesaResponse? _dragging;
+
+    protected override async Task OnInitializedAsync() => await Cargar();
+
+    private async Task Cargar()
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            _mesas = await MesaService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private IEnumerable<MesaResponse> ActiveMesas() => _mesas.Where(m => m.Activa);
+
+    // Resolve a tile position: use persisted coords, or a stacked fallback so unplaced tables
+    // are still visible and draggable. Fallback flows left-to-right then wraps.
+    private (int X, int Y) PositionFor(MesaResponse m)
+    {
+        if (m.PosicionX is { } x && m.PosicionY is { } y)
+            return (x, y);
+
+        var unplaced = ActiveMesas().Where(t => t.PosicionX is null || t.PosicionY is null).ToList();
+        var index = unplaced.FindIndex(t => t.Id == m.Id);
+        if (index < 0) index = 0;
+
+        const int perRow = 6;
+        var col = index % perRow;
+        var row = index / perRow;
+        return (10 + col * 80, 10 + row * 80);
+    }
+
+    private void OnDragStart(MesaResponse m) => _dragging = m;
+
+    // Pure-Blazor drop: DragEventArgs.OffsetX/OffsetY are relative to the drop target (the canvas),
+    // so no JS interop is needed to translate cursor coordinates. We center the 70px tile on the
+    // cursor, clamp to >= 0, optimistically update the local position, then persist.
+    private async Task OnDrop(DragEventArgs e)
+    {
+        var mesa = _dragging;
+        _dragging = null;
+        if (mesa is null)
+            return;
+
+        var x = Math.Max(0, (int)Math.Round(e.OffsetX) - 35);
+        var y = Math.Max(0, (int)Math.Round(e.OffsetY) - 35);
+
+        // Optimistic local update (records are immutable — replace in place).
+        var idx = _mesas.FindIndex(t => t.Id == mesa.Id);
+        if (idx >= 0)
+            _mesas[idx] = _mesas[idx] with { PosicionX = x, PosicionY = y };
+
+        _error = null;
+        _ok = null;
+        try
+        {
+            await MesaService.UbicarAsync(mesa.Id, new UbicarMesaRequest(x, y));
+            _ok = $"Mesa {mesa.Numero} ubicada.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            await Cargar(); // revert optimistic update from the source of truth
+        }
+    }
+
+    private void Editar(MesaResponse m)
+    {
+        _editId = m.Id;
+        _form.Numero = m.Numero;
+        _form.Capacidad = m.Capacidad;
+        _ok = null;
+        _error = null;
+    }
+
+    private void CancelarEdicion()
+    {
+        _editId = null;
+        _form.Reset();
+    }
+
+    private async Task Guardar()
+    {
+        _error = null;
+        _ok = null;
+        if (_form.Numero is not { } numero || numero <= 0)
+        {
+            _error = "El número de mesa es obligatorio.";
+            return;
+        }
+        if (_form.Capacidad is not { } capacidad || capacidad <= 0)
+        {
+            _error = "La capacidad es obligatoria.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            if (_editId is { } id)
+            {
+                await MesaService.EditarAsync(id, new EditarMesaRequest(numero, capacidad));
+                _ok = "Mesa actualizada.";
+            }
+            else
+            {
+                await MesaService.CrearAsync(new CrearMesaRequest(numero, capacidad));
+                _ok = "Mesa creada.";
+            }
+
+            _editId = null;
+            _form.Reset();
+            await Cargar();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task Desactivar(MesaResponse m)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", $"¿Desactivar la mesa {m.Numero}?");
+        if (!ok)
+            return;
+
+        _error = null;
+        _ok = null;
+        _saving = true;
+        try
+        {
+            await MesaService.DesactivarAsync(m.Id);
+            _ok = "Mesa desactivada.";
+            if (_editId == m.Id) CancelarEdicion();
+            await Cargar();
+        }
+        catch (ApiException ex)
+        {
+            // A mesa with an active pedido returns 422 — surface the API message.
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class FormModel
+    {
+        public int? Numero { get; set; }
+        public int? Capacidad { get; set; }
+
+        public void Reset()
+        {
+            Numero = null;
+            Capacidad = null;
+        }
+    }
+}
